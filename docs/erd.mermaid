@@ -1,0 +1,60 @@
+erDiagram
+    genres {
+        uuid id PK
+        text name UK
+        text slug UK
+        timestamptz created_at
+    }
+
+    mixes {
+        uuid id PK
+        text youtube_id UK
+        text title
+        text channel_name
+        text channel_id
+        text description
+        text[] tags
+        integer duration_seconds
+        text thumbnail_url
+        timestamptz published_at
+        integer view_count
+        vector(3) mood_vector
+        float valence
+        float energy
+        float instrumentation
+        boolean has_vocals
+        float classification_confidence
+        timestamptz created_at
+        timestamptz unavailable_at
+    }
+
+    mix_genres {
+        uuid mix_id FK
+        uuid genre_id FK
+    }
+
+    seed_channels {
+        uuid id PK
+        text channel_id UK
+        text channel_name
+        text uploads_playlist_id
+        boolean active
+        timestamptz last_crawled_at
+        integer total_mixes_found
+        timestamptz created_at
+    }
+
+    pipeline_runs {
+        uuid id PK
+        pipeline_type pipeline_type
+        pipeline_run_status status
+        timestamptz started_at
+        timestamptz completed_at
+        integer mixes_processed
+        integer mixes_added
+        text error_message
+        jsonb metadata
+    }
+
+    mixes ||--o{ mix_genres : "has"
+    genres ||--o{ mix_genres : "has"
