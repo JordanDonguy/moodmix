@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector  # type: ignore[import-untyped]
 from sqlalchemy import Float, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -45,6 +45,10 @@ class Mix(Base):
 
     # Classification metadata
     classification_confidence: Mapped[float | None] = mapped_column(Float)
+
+    # Chapters (parsed from description or native YouTube chapters)
+    # Format: [{"time": 0, "title": "Song 1"}, {"time": 225, "title": "Song 2"}, ...]
+    chapters: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
