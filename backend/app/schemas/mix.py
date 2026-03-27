@@ -27,7 +27,7 @@ class MixMetadata(BaseModel):
 class ClassificationResult(BaseModel):
     """Output from the LLM classifier."""
 
-    valence: float = Field(ge=-1.0, le=1.0, description="Sad (-1) to Happy (+1)")
+    mood: float = Field(ge=-1.0, le=1.0, description="Dark (-1) to Bright (+1)")
     energy: float = Field(ge=-1.0, le=1.0, description="Chill (-1) to Dynamic (+1)")
     instrumentation: float = Field(ge=-1.0, le=1.0, description="Organic (-1) to Electronic (+1)")
     genres: list[str] = Field(description="List of genre slugs")
@@ -44,7 +44,7 @@ class MixResponse(BaseModel):
     channel_name: str | None
     duration_seconds: int
     thumbnail_url: str | None
-    valence: float | None
+    mood: float | None
     energy: float | None
     instrumentation: float | None
     has_vocals: bool | None

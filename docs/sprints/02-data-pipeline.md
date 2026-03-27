@@ -67,7 +67,7 @@ data/pending_mixes_batch_001.json  (generated)
 
 ### 2.6 — Import classified results
 - [ ] Write a script that reads classified JSON and updates mixes in DB:
-  - Set mood_vector, valence, energy, instrumentation, has_vocals, classification_confidence
+  - Set mood_vector, mood, energy, instrumentation, has_vocals, classification_confidence
   - Insert into mix_genres (lookup genre by slug)
 - [ ] Verify: spot-check 20 random mixes for reasonable values
 

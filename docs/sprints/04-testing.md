@@ -47,7 +47,7 @@ tests/
 - [ ] `tests/test_mixes_router.py`
 - [ ] Test via `httpx.AsyncClient` against the actual FastAPI app:
   - `GET /api/mixes/search` with valid params → 200 + correct response shape
-  - `GET /api/mixes/search` with out-of-range valence (e.g., 5.0) → 400
+  - `GET /api/mixes/search` with out-of-range mood (e.g., 5.0) → 400
   - `GET /api/mixes/search` with genre filter → filtered results
   - `GET /api/mixes/search` with limit=0 → 400
   - `GET /api/mixes/{id}` with valid ID → 200
