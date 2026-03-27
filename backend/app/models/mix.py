@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector  # type: ignore[import-untyped]
-from sqlalchemy import Float, Integer, String, Text, func
+from sqlalchemy import Boolean, Float, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -50,6 +50,9 @@ class Mix(Base):
     # Chapters (parsed from description or native YouTube chapters)
     # Format: [{"time": 0, "title": "Song 1"}, {"time": 225, "title": "Song 2"}, ...]
     chapters: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB)
+
+    # Admin review
+    validated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
