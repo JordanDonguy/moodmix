@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.admin import setup_admin
 from app.config import settings
 from app.database import engine
 from app.exceptions import AppException
@@ -45,3 +46,6 @@ async def app_exception_handler(request: Request, exc: AppException):
 # Routers
 app.include_router(health.router)
 app.include_router(admin.router)
+
+# Admin panel
+setup_admin(app)
