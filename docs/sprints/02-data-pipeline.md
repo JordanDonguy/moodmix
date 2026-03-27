@@ -4,40 +4,48 @@
 
 **Depends on:** Sprint 1 (DB tables exist, models defined)
 
-## Tasks
+## PR 2a — Crawler service + admin endpoints (done)
 
-### 2.1 — YouTube crawler service
-- [ ] `app/services/crawler_service.py`
-- [ ] `CrawlerService` class with `httpx.AsyncClient`
-- [ ] Methods:
-  - `crawl_channel(channel_id: str)` — fetch uploads playlist → filter by duration >= 30min + embeddable → insert into `mixes` table
-  - `search_keywords(query: str)` — `search.list` with `videoDuration=long`, `videoCategoryId=10` → filter + insert
-  - `check_availability(mix_ids: list[uuid])` — batch `videos.list` → mark unavailable ones
-- [ ] For each discovered video, extract and store:
-  - youtube_id, title, channel_name, channel_id, description, tags, duration_seconds, thumbnail_url, published_at, view_count
-- [ ] Skip duplicates (ON CONFLICT youtube_id DO NOTHING)
-- [ ] Skip videos with < 1,000 views
-- [ ] Log quota usage per call
+### 2.1 — YouTube crawler service ✅
+- [x] `app/services/youtube_client.py` — low-level YouTube Data API client
+- [x] `app/services/crawler_service.py` — orchestrates crawling + DB storage
+- [x] Methods: `crawl_channel`, `search_and_crawl`, `check_availability`
+- [x] Chapter parsing from description + fallback from comments
+- [x] Skip duplicates (ON CONFLICT DO NOTHING)
+- [x] Skip videos < 1,000 views, < 20min, not embeddable
+- [x] Quota tracking
 
-> **Pattern: Single Responsibility** — `CrawlerService` only discovers and stores raw YouTube metadata. It does not classify. Classification is a separate service with its own responsibility.
+### 2.2 — Seed channels + admin ✅
+- [x] `data/seed_channels.json` + `scripts/import_seed_channels.py`
+- [x] `POST /api/admin/crawl/channel` + `POST /api/admin/crawl/search` (API key protected)
+- [x] `make seed-channels` command
 
-### 2.2 — Seed channels list
-- [ ] Create `data/seed_channels.json` with ~50-100 known channels:
-  - Channel ID + name for: Lofi Girl, Chillhop, relaxdaily, Cafe Music BGM, Yellow Brick Cinema, etc.
-- [ ] Write a script/endpoint to bulk-import seed channels into `seed_channels` table
-- [ ] Each channel entry includes `uploads_playlist_id` (derive from channel ID: replace `UC` prefix with `UU`)
+## PR 2b — Admin review tooling (next)
 
-**Files created:**
-```
-data/seed_channels.json
-```
+### 2.3 — Skipped videos tracking
+- [ ] `skipped_videos` table — stores youtube_ids we crawled but filtered out (too short, low views, not embeddable)
+- [ ] `reason` column for why it was skipped
+- [ ] Crawler checks both `mixes` and `skipped_videos` when filtering existing — enables early stop when a full page is all known
+
+### 2.4 — Mix validation field
+- [ ] Add `validated` boolean to `mixes` model (default false)
+- [ ] Only validated mixes are served to frontend users
+- [ ] Migration to add the column
+
+### 2.5 — SQLAdmin panel
+- [ ] Set up SQLAdmin at `/admin`
+- [ ] Register Mix, SeedChannel, Genre models
+- [ ] Clickable YouTube links in mix list view
+- [ ] Inline editing of mood, energy, instrumentation, genres, has_vocals, validated
 
 ### 2.3 — Initial crawl run
-- [ ] Run crawler on all seed channels (can be a temporary CLI script or admin endpoint)
+- [ ] Run crawler on all seed channels
 - [ ] Verify: mixes appear in `mixes` table with `mood_vector = NULL` (pending classification)
-- [ ] Target: 2,000-5,000 unclassified mixes
+- [ ] Target: ~1,000 unclassified mixes
 
-### 2.4 — Export for Claude Code classification
+## PR 2c — Classification pipeline
+
+### 2.6 — Export for Claude Code classification
 - [ ] Write a script that exports pending mixes as JSON:
   ```json
   [
@@ -47,21 +55,17 @@ data/seed_channels.json
       "title": "...",
       "channel_name": "...",
       "description": "...",
-      "tags": ["..."]
+      "tags": ["..."],
+      "thumbnail_url": "..."
     }
   ]
   ```
 - [ ] Export to `data/pending_mixes_batch_001.json` (batches of ~50-100)
+- [ ] Include thumbnail_url — used by Claude Code for mood classification (dark/bright axis)
 
-**Files created:**
-```
-scripts/export_pending.py
-data/pending_mixes_batch_001.json  (generated)
-```
-
-### 2.5 — Claude Code classification (manual, batched)
+### 2.7 — Claude Code classification (manual, batched)
 - [ ] Open Claude Code, feed it a batch JSON
-- [ ] Prompt it with the classification prompt from the plan
+- [ ] Prompt includes: title, channel, description, tags, thumbnail image
 - [ ] Output: classified JSON with mood vectors, genres, has_vocals, confidence
 - [ ] Repeat for all batches until initial seed is classified
 
