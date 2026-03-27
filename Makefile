@@ -16,3 +16,6 @@ test:
 
 install:
 	cd backend && uv sync
+
+seed-channels:
+	cd backend && uv run python scripts/import_seed_channels.py
