@@ -133,6 +133,12 @@ class YouTubeClient:
             for item in data.get("items", []):
                 mix = self._parse_video_item(item)
                 if mix:
+                    # Fallback: fetch chapters from comments if description had none
+                    if not mix.chapters:
+                        try:
+                            mix.chapters = await self.get_chapters_from_comments(mix.youtube_id)
+                        except Exception:
+                            logger.debug("Could not fetch comments for %s", mix.youtube_id)
                     all_mixes.append(mix)
 
         return all_mixes
@@ -230,6 +236,27 @@ class YouTubeClient:
                 result[vid] = is_embeddable and upload_status == "processed"
 
         return result
+
+    async def get_chapters_from_comments(self, video_id: str, max_comments: int = 10) -> list[Chapter] | None:
+        """Fallback: scan top comments for timestamp chapters when description has none."""
+        data = await self._get(
+            "commentThreads",
+            {
+                "part": "snippet",
+                "videoId": video_id,
+                "maxResults": max_comments,
+                "order": "relevance",
+            },
+        )
+        self._track_quota(1)
+
+        for item in data.get("items", []):
+            comment_text = item["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
+            chapters = parse_chapters(comment_text)
+            if chapters:
+                return chapters
+
+        return None
 
     async def close(self) -> None:
         await self._client.aclose()
