@@ -4,9 +4,9 @@
 
 **Depends on:** Sprint 1 (DB tables exist, models defined)
 
-## PR 2a — Crawler service + admin endpoints (done)
+## PR 2a — Crawler service + admin endpoints ✅
 
-### 2.1 — YouTube crawler service ✅
+### 2.1 — YouTube crawler service 
 - [x] `app/services/youtube_client.py` — low-level YouTube Data API client
 - [x] `app/services/crawler_service.py` — orchestrates crawling + DB storage
 - [x] Methods: `crawl_channel`, `search_and_crawl`, `check_availability`
@@ -15,35 +15,35 @@
 - [x] Skip videos < 1,000 views, < 20min, not embeddable
 - [x] Quota tracking
 
-### 2.2 — Seed channels + admin ✅
+### 2.2 — Seed channels + admin 
 - [x] `data/seed_channels.json` + `scripts/import_seed_channels.py`
 - [x] `POST /api/admin/crawl/channel` + `POST /api/admin/crawl/search` (API key protected)
 - [x] `make seed-channels` command
 
-## PR 2b — Admin review tooling (next)
+## PR 2b — Admin review tooling ✅
 
 ### 2.3 — Skipped videos tracking
-- [ ] `skipped_videos` table — stores youtube_ids we crawled but filtered out (too short, low views, not embeddable)
-- [ ] `reason` column for why it was skipped
-- [ ] Crawler checks both `mixes` and `skipped_videos` when filtering existing — enables early stop when a full page is all known
+- [x] `skipped_videos` table — stores youtube_ids we crawled but filtered out (too short, low views, not embeddable)
+- [x] `reason` column for why it was skipped
+- [x] Crawler checks both `mixes` and `skipped_videos` when filtering existing — enables early stop when a full page is all known
 
 ### 2.4 — Mix validation field
-- [ ] Add `validated` boolean to `mixes` model (default false)
-- [ ] Only validated mixes are served to frontend users
-- [ ] Migration to add the column
+- [x] Add `validated` boolean to `mixes` model (default false)
+- [x] Only validated mixes are served to frontend users
+- [x] Migration to add the column
 
 ### 2.5 — SQLAdmin panel
-- [ ] Set up SQLAdmin at `/admin`
-- [ ] Register Mix, SeedChannel, Genre models
-- [ ] Clickable YouTube links in mix list view
-- [ ] Inline editing of mood, energy, instrumentation, genres, has_vocals, validated
+- [x] Set up SQLAdmin at `/admin`
+- [x] Register Mix, SeedChannel, Genre models
+- [x] Clickable YouTube links in mix list view
+- [x] Inline editing of mood, energy, instrumentation, genres, has_vocals, validated
 
-### 2.3 — Initial crawl run
+## PR 2c — Initial crawl run
 - [ ] Run crawler on all seed channels
 - [ ] Verify: mixes appear in `mixes` table with `mood_vector = NULL` (pending classification)
 - [ ] Target: ~1,000 unclassified mixes
 
-## PR 2c — Classification pipeline
+## PR 2d — Classification pipeline
 
 ### 2.6 — Export for Claude Code classification
 - [ ] Write a script that exports pending mixes as JSON:
