@@ -115,9 +115,14 @@ class YouTubeClient:
 
         return video_ids
 
-    async def get_video_details(self, video_ids: list[str]) -> list[MixMetadata]:
-        """Fetch full details for a list of video IDs (batched by 50)."""
+    async def get_video_details(
+        self, video_ids: list[str]
+    ) -> tuple[list[MixMetadata], dict[str, str]]:
+        """Fetch full details for a list of video IDs (batched by 50).
+        Returns (valid_mixes, skipped: {youtube_id: reason}).
+        """
         all_mixes: list[MixMetadata] = []
+        skipped: dict[str, str] = {}
 
         for i in range(0, len(video_ids), 50):
             batch = video_ids[i : i + 50]
@@ -130,8 +135,11 @@ class YouTubeClient:
             )
             self._track_quota(1)
 
+            returned_ids: set[str] = set()
             for item in data.get("items", []):
-                mix = self._parse_video_item(item)
+                video_id = item["id"]
+                returned_ids.add(video_id)
+                mix, reason = self._parse_video_item(item)
                 if mix:
                     # Fallback: fetch chapters from comments if description had none
                     if not mix.chapters:
@@ -140,11 +148,20 @@ class YouTubeClient:
                         except Exception:
                             logger.debug("Could not fetch comments for %s", mix.youtube_id)
                     all_mixes.append(mix)
+                elif reason:
+                    skipped[video_id] = reason
 
-        return all_mixes
+            # Videos not returned by the API are unavailable
+            for vid in batch:
+                if vid not in returned_ids:
+                    skipped[vid] = "unavailable"
 
-    def _parse_video_item(self, item: dict[str, Any]) -> MixMetadata | None:
-        """Parse a YouTube API video item into MixMetadata, applying filters."""
+        return all_mixes, skipped
+
+    def _parse_video_item(self, item: dict[str, Any]) -> tuple[MixMetadata | None, str | None]:
+        """Parse a YouTube API video item into MixMetadata, applying filters.
+        Returns (mix, None) on success or (None, reason) on skip.
+        """
         snippet = item["snippet"]
         content = item["contentDetails"]
         status = item["status"]
@@ -152,17 +169,17 @@ class YouTubeClient:
 
         # Filter: must be embeddable
         if not status.get("embeddable", False):
-            return None
+            return None, "not_embeddable"
 
         # Filter: minimum duration (20 minutes)
         duration_seconds = parse_duration_to_seconds(content["duration"])
         if duration_seconds < 1200:
-            return None
+            return None, "too_short"
 
         # Filter: minimum views
         view_count = int(stats.get("viewCount", 0))
         if view_count < 1000:
-            return None
+            return None, "low_views"
 
         # Parse published date
         published_at = None
@@ -188,7 +205,7 @@ class YouTubeClient:
             published_at=published_at,
             view_count=view_count,
             chapters=chapters,
-        )
+        ), None
 
     async def search_videos(self, query: str, max_results: int = 30) -> list[str]:
         """Search YouTube for video IDs matching a query."""

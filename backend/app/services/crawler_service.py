@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.mix import Mix
 from app.models.seed_channel import SeedChannel
+from app.models.skipped_video import SkippedVideo
 from app.schemas.mix import MixMetadata
 from app.services.youtube_client import YouTubeClient
 
@@ -30,17 +31,18 @@ class CrawlerService:
         video_ids = await self._youtube.get_playlist_video_ids(playlist_id, max_results=max_videos)
         logger.info("Found %d videos in channel %s", len(video_ids), channel_id)
 
-        # Filter out videos we already have
-        video_ids = await self._filter_existing(video_ids)
+        # Filter out videos we already have (in mixes or skipped_videos)
+        video_ids = await self._filter_known(video_ids)
         if not video_ids:
             logger.info("No new videos to process for channel %s", channel_id)
             return 0, 0
 
         logger.info("Fetching details for %d new videos", len(video_ids))
-        mixes = await self._youtube.get_video_details(video_ids)
-        logger.info("After filtering: %d valid mixes", len(mixes))
+        mixes, skipped = await self._youtube.get_video_details(video_ids)
+        logger.info("After filtering: %d valid mixes, %d skipped", len(mixes), len(skipped))
 
         added = await self._insert_mixes(mixes)
+        await self._insert_skipped(skipped)
 
         # Update seed channel stats
         await self._update_seed_channel(channel_id, added)
@@ -50,14 +52,14 @@ class CrawlerService:
     async def search_and_crawl(self, query: str, max_results: int = 30) -> tuple[int, int]:
         """Search YouTube for mixes matching a query. Returns (mixes_found, mixes_added)."""
         video_ids = await self._youtube.search_videos(query, max_results=max_results)
-        video_ids = await self._filter_existing(video_ids)
-
+        video_ids = await self._filter_known(video_ids)
 
         if not video_ids:
             return 0, 0
 
-        mixes = await self._youtube.get_video_details(video_ids)
+        mixes, skipped = await self._youtube.get_video_details(video_ids)
         added = await self._insert_mixes(mixes)
+        await self._insert_skipped(skipped)
 
         return len(mixes), added
 
@@ -92,19 +94,27 @@ class CrawlerService:
         logger.info("Checked %d mixes, marked %d as unavailable", len(youtube_ids), marked)
         return len(youtube_ids), marked
 
-    async def _filter_existing(self, video_ids: list[str]) -> list[str]:
-        """Remove video IDs that already exist in the DB."""
+    async def _filter_known(self, video_ids: list[str]) -> list[str]:
+        """Remove video IDs that already exist in mixes or skipped_videos."""
         if not video_ids:
             return []
 
+        # Check mixes table
         result = await self._db.execute(
             select(Mix.youtube_id).where(Mix.youtube_id.in_(video_ids))
         )
-        existing = {row[0] for row in result.all()}
-        filtered = [vid for vid in video_ids if vid not in existing]
+        known: set[str] = {row[0] for row in result.all()}
 
-        if existing:
-            logger.debug("Skipped %d existing videos", len(existing))
+        # Check skipped_videos table
+        result = await self._db.execute(
+            select(SkippedVideo.youtube_id).where(SkippedVideo.youtube_id.in_(video_ids))
+        )
+        known.update(row[0] for row in result.all())
+
+        filtered = [vid for vid in video_ids if vid not in known]
+
+        if known:
+            logger.debug("Skipped %d known videos (%d in mixes, rest in skipped)", len(known), len(known) - len(filtered))
 
         return filtered
 
@@ -131,8 +141,23 @@ class CrawlerService:
 
         await self._db.commit()
         added = len(mixes)
-        logger.info("Inserted %d new mixes (%d duplicates skipped)", added, len(mixes) - added)
+        logger.info("Inserted %d new mixes", added)
         return added
+
+    async def _insert_skipped(self, skipped: dict[str, str]) -> None:
+        """Record skipped video IDs with their rejection reason."""
+        if not skipped:
+            return
+
+        for youtube_id, reason in skipped.items():
+            stmt = insert(SkippedVideo).values(
+                youtube_id=youtube_id,
+                reason=reason,
+            ).on_conflict_do_nothing(index_elements=["youtube_id"])
+            await self._db.execute(stmt)
+
+        await self._db.commit()
+        logger.debug("Recorded %d skipped videos", len(skipped))
 
     async def _update_seed_channel(self, channel_id: str, mixes_added: int) -> None:
         """Update seed channel stats after a crawl."""
