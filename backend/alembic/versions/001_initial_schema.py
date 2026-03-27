@@ -37,14 +37,11 @@ def upgrade() -> None:
             ('Chill Electronic', 'chill-electronic'),
             ('Deep House', 'deep-house'),
             ('Drum & Bass', 'drum-and-bass'),
-            ('Downtempo', 'downtempo'),
             ('Neo-Soul / R&B', 'neo-soul-r-and-b'),
-            ('Reggae / Dub', 'reggae-dub'),
-            ('Guitar', 'guitar'),
             ('Jazz', 'jazz'),
-            ('Blues', 'blues'),
             ('Ambient', 'ambient'),
-            ('Environment', 'environment')
+            ('Ambient', 'ambient'),
+            ('Acoustic & Piano', 'acoustic-and-piano')
     """)
 
     # Mixes
