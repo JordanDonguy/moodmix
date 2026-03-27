@@ -14,7 +14,7 @@
   - Runs via stdio transport (for Claude Desktop / Claude Code)
 
 ### 10.2 — Read tools
-- [ ] `search_mixes(valence, energy, instrumentation, genres, instrumental, limit)` — same logic as the search endpoint
+- [ ] `search_mixes(mood, energy, instrumentation, genres, instrumental, limit)` — same logic as the search endpoint
 - [ ] `get_catalog_stats()` — total mixes, mixes per genre, mood coverage summary
 - [ ] `get_catalog_analytics()` — returns latest analytics report
 - [ ] `get_low_confidence_mixes(threshold, limit)` — mixes below confidence threshold for review
@@ -22,7 +22,7 @@
 ### 10.3 — Write tools
 - [ ] `add_seed_channel(channel_id, channel_name)` — insert into seed_channels
 - [ ] `trigger_crawl(type)` — enqueue a Celery task (channel_crawl | keyword_search)
-- [ ] `update_mix_classification(mix_id, valence, energy, instrumentation, genres, has_vocals)` — manually fix a misclassified mix
+- [ ] `update_mix_classification(mix_id, mood, energy, instrumentation, genres, has_vocals)` — manually fix a misclassified mix
 
 ### 10.4 — Claude Desktop configuration
 - [ ] Document how to add the MCP server to Claude Desktop config:

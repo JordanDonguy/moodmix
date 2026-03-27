@@ -185,7 +185,7 @@ Tags: {{tags}}
 
 Step 1: Describe what this mix likely sounds like.
 Step 2: Rate each dimension from -1.0 to 1.0 with brief justification:
-  - valence: -1 (melancholic/sad) to +1 (uplifting/happy)
+  - mood: -1 (dark/moody) to +1 (bright/uplifting)
   - energy: -1 (ambient/chill) to +1 (dynamic/driving)
   - instrumentation: -1 (organic/acoustic) to +1 (electronic/synthetic)
 Step 3: Confidence (0.0-1.0) for each rating.
@@ -231,7 +231,7 @@ create table mixes (
   mood_vector vector(3),
 
   -- Individual scores (for slider filtering + display)
-  valence float,          -- -1 to 1: sad ↔ happy
+  mood float,          -- -1 to 1: dark ↔ bright
   energy float,           -- -1 to 1: chill ↔ dynamic
   instrumentation float,  -- -1 to 1: organic ↔ electronic
 
@@ -274,41 +274,52 @@ create table seed_channels (
 
 The `genres` table is pre-seeded with 14 genres focused on background music: lo-fi, hip-hop, synthwave, chill electronic, deep house, drum & bass, downtempo, neo-soul/R&B, reggae/dub, guitar, jazz, blues, ambient, environment. The LLM classifier picks from this list — no free-text genres to avoid duplicates like "lo-fi" vs "lofi" vs "Lo-Fi".
 
-**pgvector query in `mix_service.py`:**
-```python
-from sqlalchemy import text
+**Mood vector axes (3D):**
+- **Mood** (dark 🌙 ↔ bright ☀️) — atmosphere/vibe, not sad/happy. Kind of subjective. Synthwave more likely to be dark / night, while bossa nova more likely to be day / bright for example.
+- **Energy** (chill 🛋️ ↔ dynamic ⚡) — tempo, intensity, drive.
+- **Instrumentation** (organic 🥁 ↔ electronic 💻) — real instruments vs synthesized.
 
-async def search_by_mood(
-    session: AsyncSession,
-    query_vector: list[float],
-    genres: list[str] | None,
-    instrumental: bool,
-    limit: int,
-    offset: int,
-) -> list[Mix]:
-    query = text("""
-        SELECT m.* FROM mixes m
-        WHERE m.status = 'classified'
-          AND m.is_valid_mix = true
-          AND (:instrumental = false OR m.has_vocals = false)
-          AND (:no_genre_filter OR m.id IN (
-              SELECT mg.mix_id FROM mix_genres mg
-              JOIN genres g ON g.id = mg.genre_id
-              WHERE g.slug = ANY(:genres)
-          ))
-        ORDER BY m.mood_vector <=> cast(:query_vector as vector)
-        LIMIT :limit OFFSET :offset
-    """)
-    result = await session.execute(query, {
-        "query_vector": str(query_vector),
-        "instrumental": instrumental,
-        "no_genre_filter": genres is None or len(genres) == 0,
-        "genres": genres or [],
-        "limit": limit,
-        "offset": offset,
-    })
-    return result.fetchall()
+**Deactivatable sliders:**
+Each slider can be toggled on/off. Default state = all off → browsing mode (random mixes). User activates only the dimensions they care about.
+
+**Search strategy depending on active sliders:**
+
 ```
+0 sliders active → random mixes (seeded RANDOM() for stable pagination)
+1 slider active  → WHERE + ABS() distance on that column, ORDER BY RANDOM()
+2 sliders active → WHERE + ABS() distance on both columns, ORDER BY RANDOM()
+3 sliders active → pgvector cosine similarity (full vector search)
+```
+
+All cases: results within a ±0.25 range of target value(s), weighted by proximity to center of range (closer = more likely to appear). Random jitter added so results vary but center-biased.
+
+**Session-stable randomness with SETSEED:**
+Frontend generates a random seed per session (e.g., `0.42`). Sent with every request.
+Same seed = same random order = consistent infinite scroll pagination.
+New session (page refresh) = new seed = fresh shuffle.
+
+```sql
+SELECT SETSEED(:seed);
+SELECT * FROM mixes
+WHERE unavailable_at IS NULL
+  AND energy BETWEEN :energy - 0.25 AND :energy + 0.25
+  AND (:no_genre_filter OR id IN (
+      SELECT mix_id FROM mix_genres mg JOIN genres g ON g.id = mg.genre_id
+      WHERE g.slug = ANY(:genres)
+  ))
+ORDER BY ABS(energy - :energy) + (RANDOM() * 0.3)
+LIMIT :limit OFFSET :offset;
+```
+
+For 3 sliders active (full vector search):
+```sql
+SELECT SETSEED(:seed);
+SELECT * FROM mixes
+WHERE unavailable_at IS NULL
+ORDER BY mood_vector <=> cast(:query_vector as vector) + (RANDOM() * 0.05)
+LIMIT :limit OFFSET :offset;
+```
+(Small random jitter added to vector distance so equally-close mixes shuffle.)
 
 ---
 
@@ -318,8 +329,10 @@ async def search_by_mood(
 GET  /api/genres
      → returns all genres (for populating the filter chips)
 
-GET  /api/mixes/search?valence=0.3&energy=-0.5&instrumentation=-0.2&genres=jazz,lo-fi&instrumental=true&limit=20&offset=0
-     → constructs vector [0.3, -0.5, -0.2], filters by genres via JOIN, runs pgvector cosine similarity
+GET  /api/mixes/search?mood=0.3&energy=-0.5&instrumentation=-0.2&genres=jazz,lo-fi&instrumental=true&seed=0.42&limit=20&offset=0
+     → each slider param is optional (only sent if that slider is active)
+     → 0 sliders: random browse. 1-2 sliders: range filter + random. 3 sliders: pgvector cosine similarity.
+     → seed: session-stable random seed for consistent pagination
      → instrumental=true filters to has_vocals = false
      → instrumental=false (default) returns all mixes regardless of vocal content
      → paginated: frontend uses infinite scroll, fetching next batch of 20 via offset
@@ -336,7 +349,7 @@ POST /api/mixes/{id}/report-unavailable
      → marks mix as status = 'unavailable', excluded from future searches
 
 POST /api/mixes/{id}/feedback
-     body: { "valence_delta": -0.2, "energy_delta": 0.1 }
+     body: { "mood_delta": -0.2, "energy_delta": 0.1 }
      → user feedback to refine classification (future)
 
 GET  /api/health
@@ -495,10 +508,18 @@ Two complementary strategies:
 The app is free and self-explanatory. Let users play music within seconds. A landing page can be added later for SEO if needed.
 
 ### Default state on load
-- All sliders at center (0, 0, 0) — neutral mood
+- Mood slider auto-enabled and set to time of day (bright in the morning, dark at night)
+- Energy and instrumentation sliders off by default
 - Mixes already loaded immediately — no empty state, no "start searching" prompt
-- User sees results and can play within 2 seconds, then tweak sliders from there
-- Neutral [0, 0, 0] naturally surfaces mid-energy, mid-valence, mixed instrumentation — good default for background work music
+- User sees time-appropriate mixes and can play within 2 seconds, then tweak sliders from there
+- App feels personalized from the first second with zero setup
+
+### Auto time-of-day mood (frontend only, no backend involvement)
+- Mood slider follows a smooth sine curve mapped to local time: peaks bright at noon, troughs dark at midnight
+- Small clock icon (🕐) toggle next to the mood slider indicates auto-mode is active
+- User can grab the slider to override — this disables auto-mode
+- Clicking the clock icon re-enables auto-mode
+- Preference (auto on/off) persisted in localStorage
 
 ### No accounts (v1)
 - Zero friction: arrive → listen. No signup wall.
@@ -571,7 +592,7 @@ The app is free and self-explanatory. Let users play music within seconds. A lan
 
 ### Phase 7 — Redis caching
 29. Add Redis to docker-compose
-30. Cache search results — key = hash of (valence, energy, instrumentation, genres, instrumental, offset), TTL ~30-60s
+30. Cache search results — key = hash of (mood, energy, instrumentation, genres, instrumental, offset), TTL ~30-60s
 31. Cache genre list (`GET /api/genres`) — rarely changes, TTL ~1 hour
 32. Invalidate relevant caches when new mixes are classified or mixes are marked unavailable
 
@@ -654,7 +675,7 @@ The app is free and self-explanatory. Let users play music within seconds. A lan
 1. **FastAPI**: App starts, connects to Supabase, Alembic migration runs successfully
 2. **Crawler**: Run on 5 seed channels → verify mixes appear in DB with correct metadata
 3. **Classifier**: Classify 50 mixes → manually spot-check 10 for reasonable vector values
-4. **API**: `GET /api/mixes/search?valence=-1&energy=-1&instrumentation=-1` returns sad/chill/organic mixes
+4. **API**: `GET /api/mixes/search?mood=-1&energy=-1&instrumentation=-1` returns dark/chill/organic mixes
 5. **AI search**: `POST /api/mixes/ai-search` with "upbeat electronic focus music" → plausible results
 6. **Frontend**: Sliders move → results update → click → YouTube embed plays
 7. **Redis**: Second identical search request returns cached result (check response time drop)

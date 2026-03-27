@@ -17,7 +17,7 @@
 - [ ] Count mixes per region using pandas `cut()` + `groupby()`
 - [ ] Identify sparse regions (< 5 mixes)
 - [ ] Generate suggested search queries for sparse regions:
-  - Map bin ranges to descriptive terms (e.g., valence [0.6, 1] = "happy/uplifting", energy [-1, -0.6] = "ambient/calm")
+  - Map bin ranges to descriptive terms (e.g., mood [0.6, 1] = "bright/uplifting", energy [-1, -0.6] = "ambient/calm")
   - Combine terms into YouTube search queries
 
 ### 9.3 — Genre distribution

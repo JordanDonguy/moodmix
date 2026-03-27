@@ -102,7 +102,7 @@ erDiagram
         timestamptz published_at
         integer view_count
         vector(3) mood_vector
-        float valence
+        float mood
         float energy
         float instrumentation
         boolean has_vocals

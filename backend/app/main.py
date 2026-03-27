@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.database import engine
 from app.exceptions import AppException
-from app.routers import health
+from app.routers import admin, health
 
 logger = logging.getLogger(__name__)
 
@@ -44,3 +44,4 @@ async def app_exception_handler(request: Request, exc: AppException):
 
 # Routers
 app.include_router(health.router)
+app.include_router(admin.router)

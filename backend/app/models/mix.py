@@ -32,11 +32,12 @@ class Mix(Base):
     published_at: Mapped[datetime | None] = mapped_column()
     view_count: Mapped[int | None] = mapped_column(Integer)
 
-    # Mood vector (3D: [valence, energy, instrumentation])
+    # Mood vector (3D: [mood, energy, instrumentation])
+    # mood: dark (-1) ↔ bright (+1), energy: chill (-1) ↔ dynamic (+1), instrumentation: organic (-1) ↔ electronic (+1)
     mood_vector = mapped_column(Vector(3))
 
     # Individual mood scores
-    valence: Mapped[float | None] = mapped_column(Float)
+    mood: Mapped[float | None] = mapped_column(Float)
     energy: Mapped[float | None] = mapped_column(Float)
     instrumentation: Mapped[float | None] = mapped_column(Float)
 

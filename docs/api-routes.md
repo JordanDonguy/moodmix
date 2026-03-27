@@ -29,7 +29,7 @@ Main search endpoint. Combines pgvector similarity with genre/vocal filters.
 **Query params**
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `valence` | float (-1 to 1) | `0` | Sad ↔ Happy |
+| `mood` | float (-1 to 1) | `0` | Dark ↔ Bright |
 | `energy` | float (-1 to 1) | `0` | Chill ↔ Dynamic |
 | `instrumentation` | float (-1 to 1) | `0` | Organic ↔ Electronic |
 | `genres` | string (comma-separated slugs) | _none_ | Filter by genres. Empty = all genres |
@@ -48,7 +48,7 @@ Main search endpoint. Combines pgvector similarity with genre/vocal filters.
       "channel_name": "Cafe Music BGM",
       "thumbnail_url": "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
       "duration_seconds": 3600,
-      "valence": 0.3,
+      "mood": 0.3,
       "energy": -0.6,
       "instrumentation": -0.8,
       "has_vocals": false,
@@ -86,7 +86,7 @@ Natural language search. LLM converts text to mood vector + optional genre/vocal
 {
   "mixes": [ ... ],
   "inferred": {
-    "valence": -0.2,
+    "mood": -0.2,
     "energy": -0.6,
     "instrumentation": -0.4,
     "genres": ["jazz", "lo-fi"],
@@ -310,8 +310,8 @@ Returns the latest catalog analytics report.
     "covered_regions": 108,
     "coverage_pct": 86.4,
     "sparse_regions": [
-      { "valence": [0.6, 1.0], "energy": [0.6, 1.0], "instrumentation": [-1.0, -0.6], "count": 2 },
-      { "valence": [-1.0, -0.6], "energy": [0.6, 1.0], "instrumentation": [0.6, 1.0], "count": 1 }
+      { "mood": [0.6, 1.0], "energy": [0.6, 1.0], "instrumentation": [-1.0, -0.6], "count": 2 },
+      { "mood": [-1.0, -0.6], "energy": [0.6, 1.0], "instrumentation": [0.6, 1.0], "count": 1 }
     ],
     "suggested_queries": [
       "upbeat happy acoustic folk mix 1 hour",

@@ -13,7 +13,7 @@
 - [ ] Connect/disconnect in FastAPI lifespan handler
 
 ### 7.2 — Search result caching
-- [ ] Cache key = hash of all search params: `search:{hash(valence, energy, instrumentation, genres, instrumental, limit, offset)}`
+- [ ] Cache key = hash of all search params: `search:{hash(mood, energy, instrumentation, genres, instrumental, limit, offset)}`
 - [ ] TTL: 30-60 seconds
 - [ ] On cache hit: return cached JSON directly (skip DB query)
 - [ ] On cache miss: query DB, serialize response, store in Redis, return

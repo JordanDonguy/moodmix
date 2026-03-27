@@ -30,7 +30,7 @@
 
 ### 5.3 — Zustand store
 - [ ] `store/searchStore.ts` — manages search/filter state:
-  - `valence`, `energy`, `instrumentation` (slider values, default 0)
+  - `mood`, `energy`, `instrumentation` (slider values, default 0)
   - `selectedGenres: string[]` (genre slugs)
   - `instrumental: boolean` (default false)
   - Actions: `setValence()`, `setEnergy()`, `setInstrumentation()`, `toggleGenre()`, `toggleInstrumental()`

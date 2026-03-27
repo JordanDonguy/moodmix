@@ -27,14 +27,10 @@ insert into genres (name, slug) values
   ('Chill Electronic', 'chill-electronic'),
   ('Deep House', 'deep-house'),
   ('Drum & Bass', 'drum-and-bass'),
-  ('Downtempo', 'downtempo'),
   ('Neo-Soul / R&B', 'neo-soul-r-and-b'),
-  ('Reggae / Dub', 'reggae-dub'),
-  ('Guitar', 'guitar'),
   ('Jazz', 'jazz'),
-  ('Blues', 'blues'),
   ('Ambient', 'ambient'),
-  ('Environment', 'environment');
+  ('Acoustic & Piano', 'acoustic-and-piano');
 
 -- ============================================================
 -- MIXES
@@ -59,11 +55,11 @@ create table mixes (
   view_count integer,
 
   -- Mood vector (3D, for pgvector similarity search)
-  -- [valence, energy, instrumentation]
+  -- [mood, energy, instrumentation]
   mood_vector vector(3),
 
   -- Individual mood scores (for slider filtering + card display)
-  valence float,                        -- -1.0 (sad) to +1.0 (happy)
+  mood float,                            -- -1.0 (dark) to +1.0 (bright)
   energy float,                         -- -1.0 (chill) to +1.0 (dynamic)
   instrumentation float,                -- -1.0 (organic) to +1.0 (electronic)
 

@@ -8,13 +8,13 @@
 
 ### 3.1 — Pydantic schemas
 - [ ] `app/schemas/mix.py`
-  - `MixResponse` — what the frontend receives per mix (id, youtube_id, title, channel_name, thumbnail_url, duration_seconds, valence, energy, instrumentation, has_vocals, genres list)
+  - `MixResponse` — what the frontend receives per mix (id, youtube_id, title, channel_name, thumbnail_url, duration_seconds, mood, energy, instrumentation, has_vocals, genres list)
   - `MixSearchResponse` — `{ mixes: list[MixResponse], total: int, limit: int, offset: int }`
 - [ ] `app/schemas/genre.py`
   - `GenreResponse` — id, name, slug
 - [ ] `app/schemas/search.py`
   - `AiSearchRequest` — `{ query: str }`
-  - `AiSearchResponse` — extends MixSearchResponse + `inferred` object (valence, energy, instrumentation, genres, instrumental)
+  - `AiSearchResponse` — extends MixSearchResponse + `inferred` object (mood, energy, instrumentation, genres, instrumental)
 - [ ] `app/schemas/admin.py`
   - `TriggerCrawlRequest` — `{ type: str }` (channel_crawl | keyword_search | availability_check)
   - `AddChannelRequest` — `{ channel_id: str, channel_name: str }`
@@ -38,7 +38,7 @@ app/schemas/
 
 ### 3.2 — Mix service
 - [ ] `app/services/mix_service.py`
-- [ ] `search_mixes(session, valence, energy, instrumentation, genres, instrumental, limit, offset)` — pgvector cosine similarity query with filters
+- [ ] `search_mixes(session, mood, energy, instrumentation, genres, instrumental, limit, offset)` — pgvector cosine similarity query with filters
 - [ ] `get_mix_by_id(session, mix_id)` — single mix lookup
 - [ ] `report_unavailable(session, mix_id)` — set unavailable_at, nullify mood_vector so it drops from search
 - [ ] Test query manually: verify results are ordered by mood similarity
@@ -52,7 +52,7 @@ app/schemas/
 
 ### 3.4 — Mixes router
 - [ ] `app/routers/mixes.py`
-- [ ] `GET /api/mixes/search` — query params: valence, energy, instrumentation, genres (comma-sep), instrumental (bool), limit, offset
+- [ ] `GET /api/mixes/search` — query params: mood, energy, instrumentation, genres (comma-sep), instrumental (bool), limit, offset
   - Validate ranges (-1 to 1 for mood params, 1-50 for limit)
   - Call `mix_service.search_mixes()`
   - Return `MixSearchResponse`
@@ -63,7 +63,7 @@ app/schemas/
 ### 3.5 — AI search service + endpoint
 - [ ] `app/services/ai_search_service.py`
 - [ ] `parse_natural_language(query: str) -> InferredSearch` — sends query to LLM, returns mood vector + optional genres + instrumental flag
-- [ ] Prompt: "Convert this into mood values (valence -1 to 1, energy -1 to 1, instrumentation -1 to 1) and optionally genres from this list: [...]. Respond as JSON."
+- [ ] Prompt: "Convert this into mood values (mood -1 to 1, energy -1 to 1, instrumentation -1 to 1) and optionally genres from this list: [...]. Respond as JSON."
 - [ ] `POST /api/mixes/ai-search` in mixes router — calls AI search service, then mix_service.search_mixes(), returns results + inferred values
 - [ ] Test: "rainy day coffee shop vibes" → expect negative energy, jazz/lo-fi genres
 
@@ -115,7 +115,7 @@ app/routers/admin.py
 
 - [ ] All endpoints visible in Swagger UI at `/docs`
 - [ ] `GET /api/genres` returns 14 genres
-- [ ] `GET /api/mixes/search?valence=-1&energy=-1&instrumentation=-1` returns sad/chill/organic mixes
+- [ ] `GET /api/mixes/search?mood=-1&energy=-1&instrumentation=-1` returns dark/chill/organic mixes
 - [ ] `POST /api/mixes/ai-search` with "upbeat electronic" returns relevant results + inferred slider values
 - [ ] Admin endpoints return 401 without API key, 200 with correct key
 - [ ] Rate limiter blocks 6th AI search request within a minute

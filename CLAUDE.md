@@ -40,6 +40,7 @@ moodmix/
 - **Type hints** on all function signatures.
 - `async` for all I/O-bound operations (DB, HTTP calls).
 - No bare `except:` — always catch specific exceptions.
+- **Zero linter errors** — all Python files must pass Pyright checks. Use explicit generic types (`dict[str, str]` not `dict`), `from __future__ import annotations` for forward refs, `TYPE_CHECKING` for circular imports. Avoid `Any` — only acceptable at external API boundaries (e.g., raw JSON from YouTube API).
 
 ### Backend Architecture
 
