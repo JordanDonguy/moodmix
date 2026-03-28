@@ -115,14 +115,47 @@ class YouTubeClient:
 
         return video_ids
 
+    async def search_channel_videos(
+        self, channel_id: str, max_results: int = 200
+    ) -> list[str]:
+        """Search a channel for long, embeddable music videos, ordered by views."""
+        video_ids: list[str] = []
+        page_token = None
+
+        while len(video_ids) < max_results:
+            params: dict[str, Any] = {
+                "part": "id",
+                "channelId": channel_id,
+                "type": "video",
+                "videoDuration": "long",
+                "videoEmbeddable": "true",
+                "videoCategoryId": "10",  # Music category
+                "maxResults": min(50, max_results - len(video_ids)),
+                "order": "viewCount",
+            }
+            if page_token:
+                params["pageToken"] = page_token
+
+            data = await self._get("search", params)
+            self._track_quota(100)
+
+            for item in data.get("items", []):
+                video_ids.append(item["id"]["videoId"])
+
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+
+        return video_ids
+
     async def get_video_details(
         self, video_ids: list[str]
-    ) -> tuple[list[MixMetadata], dict[str, str]]:
+    ) -> tuple[list[MixMetadata], dict[str, tuple[str, str | None]]]:
         """Fetch full details for a list of video IDs (batched by 50).
-        Returns (valid_mixes, skipped: {youtube_id: reason}).
+        Returns (valid_mixes, skipped: {youtube_id: (reason, title)}).
         """
         all_mixes: list[MixMetadata] = []
-        skipped: dict[str, str] = {}
+        skipped: dict[str, tuple[str, str | None]] = {}
 
         for i in range(0, len(video_ids), 50):
             batch = video_ids[i : i + 50]
@@ -138,6 +171,7 @@ class YouTubeClient:
             returned_ids: set[str] = set()
             for item in data.get("items", []):
                 video_id = item["id"]
+                title = item["snippet"]["title"]
                 returned_ids.add(video_id)
                 mix, reason = self._parse_video_item(item)
                 if mix:
@@ -149,12 +183,12 @@ class YouTubeClient:
                             logger.debug("Could not fetch comments for %s", mix.youtube_id)
                     all_mixes.append(mix)
                 elif reason:
-                    skipped[video_id] = reason
+                    skipped[video_id] = (reason, title)
 
             # Videos not returned by the API are unavailable
             for vid in batch:
                 if vid not in returned_ids:
-                    skipped[vid] = "unavailable"
+                    skipped[vid] = ("unavailable", None)
 
         return all_mixes, skipped
 
@@ -218,6 +252,7 @@ class YouTubeClient:
                 "q": query,
                 "type": "video",
                 "videoDuration": "long",
+                "videoEmbeddable": "true",
                 "videoCategoryId": "10",  # Music category
                 "maxResults": min(50, max_results - len(video_ids)),
                 "order": "viewCount",
