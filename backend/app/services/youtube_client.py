@@ -205,10 +205,12 @@ class YouTubeClient:
         if not status.get("embeddable", False):
             return None, "not_embeddable"
 
-        # Filter: minimum duration (20 minutes)
+        # Filter: duration between 20 minutes and 4 hours
         duration_seconds = parse_duration_to_seconds(content["duration"])
         if duration_seconds < 1200:
             return None, "too_short"
+        if duration_seconds > 14400:
+            return None, "too_long"
 
         # Filter: minimum views
         view_count = int(stats.get("viewCount", 0))
