@@ -67,8 +67,8 @@ class GenreAdmin(ModelView, model=Genre):
 
 
 class SkippedVideoAdmin(ModelView, model=SkippedVideo):
-    column_list = [SkippedVideo.youtube_id, SkippedVideo.reason, SkippedVideo.created_at]
-    column_searchable_list = [SkippedVideo.youtube_id]
+    column_list = [SkippedVideo.title, SkippedVideo.youtube_id, SkippedVideo.reason, SkippedVideo.created_at]
+    column_searchable_list = [SkippedVideo.youtube_id, SkippedVideo.title]
     column_sortable_list = [SkippedVideo.reason, SkippedVideo.created_at]
     column_default_sort = ("created_at", True)
     can_create = False
