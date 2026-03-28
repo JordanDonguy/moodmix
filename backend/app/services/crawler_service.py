@@ -75,18 +75,24 @@ class CrawlerService:
         now = datetime.now(timezone.utc)
         marked = 0
 
-        for yt_id, is_available in availability.items():
-            if not is_available:
-                mix = (await self._db.execute(
-                    select(Mix).where(Mix.youtube_id == yt_id)
-                )).scalar_one_or_none()
+        for yt_id, (is_available, view_count) in availability.items():
+            mix = (await self._db.execute(
+                select(Mix).where(Mix.youtube_id == yt_id)
+            )).scalar_one_or_none()
 
-                if mix:
-                    mix.unavailable_at = now
-                    marked += 1
+            if not mix:
+                continue
+
+            # Update view count
+            mix.view_count = view_count
+
+            # Mark unavailable if needed
+            if not is_available:
+                mix.unavailable_at = now
+                marked += 1
 
         await self._db.commit()
-        logger.info("Checked %d mixes, marked %d as unavailable", len(youtube_ids), marked)
+        logger.info("Checked %d mixes, marked %d as unavailable, view counts updated", len(youtube_ids), marked)
         return len(youtube_ids), marked
 
     async def _filter_known(self, video_ids: list[str]) -> list[str]:

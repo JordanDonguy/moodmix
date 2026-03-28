@@ -272,20 +272,25 @@ class YouTubeClient:
 
         return video_ids
 
-    async def check_video_availability(self, video_ids: list[str]) -> dict[str, bool]:
-        """Check which video IDs are still available. Returns {video_id: is_available}."""
-        result: dict[str, bool] = {vid: False for vid in video_ids}
+    async def check_video_availability(
+        self, video_ids: list[str]
+    ) -> dict[str, tuple[bool, int]]:
+        """Check which video IDs are still available and get updated view counts.
+        Returns {video_id: (is_available, view_count)}.
+        """
+        result: dict[str, tuple[bool, int]] = {vid: (False, 0) for vid in video_ids}
 
         for i in range(0, len(video_ids), 50):
             batch = video_ids[i : i + 50]
-            data = await self._get("videos", {"part": "status", "id": ",".join(batch)})
+            data = await self._get("videos", {"part": "status,statistics", "id": ",".join(batch)})
             self._track_quota(1)
 
             for item in data.get("items", []):
                 vid = item["id"]
                 is_embeddable = item["status"].get("embeddable", False)
                 upload_status = item["status"].get("uploadStatus", "")
-                result[vid] = is_embeddable and upload_status == "processed"
+                view_count = int(item.get("statistics", {}).get("viewCount", 0))
+                result[vid] = (is_embeddable and upload_status == "processed", view_count)
 
         return result
 
