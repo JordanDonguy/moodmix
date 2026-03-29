@@ -2,14 +2,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqladmin import Admin, ModelView
+from sqladmin import Admin, ModelView, action
+from starlette.requests import Request
+from starlette.responses import RedirectResponse
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
-from app.database import engine
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
+
+from app.database import async_session, engine
 from app.models.genre import Genre
 from app.models.mix import Mix
+from app.models.mix_genre import mix_genres
 from app.models.seed_channel import SeedChannel
 from app.models.skipped_video import SkippedVideo
 
@@ -34,6 +40,7 @@ class MixAdmin(ModelView, model=Mix):
         Mix.instrumentation, Mix.validated, Mix.view_count, Mix.created_at,
     ]
     column_default_sort = ("created_at", True)
+    column_details_exclude_list = [Mix.mood_vector]
     @staticmethod
     def _youtube_link(m: Mix, _: str) -> str:
         return f'<a href="https://youtube.com/watch?v={m.youtube_id}" target="_blank">{m.youtube_id}</a>'
@@ -46,6 +53,38 @@ class MixAdmin(ModelView, model=Mix):
         "has_vocals", "validated", "genres",
     ]
     page_size = 50
+
+    @action(
+        name="reject",
+        label="Reject (move to skipped)",
+        confirmation_message="Move selected mixes to skipped videos and delete them?",
+    )
+    async def reject_mixes(self, request: Request) -> RedirectResponse:
+        pks = request.query_params.get("pks", "").split(",")
+        if pks:
+            async with async_session() as db:
+                for pk in pks:
+                    mix = (await db.execute(
+                        select(Mix).where(Mix.id == pk)
+                    )).scalar_one_or_none()
+                    if mix:
+                        await db.execute(
+                            insert(SkippedVideo).values(
+                                youtube_id=mix.youtube_id,
+                                title=mix.title,
+                                reason="rejected",
+                            ).on_conflict_do_nothing(index_elements=["youtube_id"])
+                        )
+                        # Remove genre associations
+                        from sqlalchemy import delete
+                        await db.execute(
+                            delete(mix_genres).where(mix_genres.c.mix_id == mix.id)
+                        )
+                        await db.delete(mix)
+                await db.commit()
+
+        referer = request.headers.get("referer", "/admin/mix/list")
+        return RedirectResponse(referer)
 
 
 class SeedChannelAdmin(ModelView, model=SeedChannel):
