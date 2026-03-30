@@ -42,18 +42,20 @@ These are typical ranges — individual mixes can deviate based on their specifi
 
 | Genre | Mood | Energy | Instrumentation |
 |---|---|---|---|
-| Lo-Fi | -0.4 to 0.4 | -0.6 to -0.1 | -0.3 to 0.3 |
+| Lo-Fi | -0.4 to 0.3 | -0.6 to -0.1 | -0.3 to 0.3 |
 | Hip-Hop | -0.4 to 0.3 | -0.4 to 0.2 | -0.2 to 0.4 |
 | Jazz | -0.3 to 0.6 | -0.4 to 0.3 | -0.8 to -0.3 |
 | Neo-Soul / R&B | -0.4 to 0.3 | -0.4 to 0.2 | -0.5 to 0.1 |
-| Synthwave | -1 to -0.1 | -0.2 to 0.5 | 0.5 to 0.9 |
+| Synthwave | -0.8 to -0.1 | -0.2 to 0.5 | 0.5 to 0.9 |
 | Chill Electronic | -0.6 to 0.1 | -0.6 to 0.0 | 0.3 to 0.8 |
 | Deep House | -0.5 to 0.3 | 0.0 to 0.5 | 0.3 to 0.8 |
-| Drum & Bass | -1 to -0.1 | 0.4 to 0.8 | 0.4 to 0.8 |
+| Drum & Bass | -0.6 to -0.1 | 0.4 to 0.8 | 0.4 to 0.8 |
 | Ambient | -0.8 to -0.1 | -0.9 to -0.5 | -0.2 to 0.6 |
-| Acoustic & Piano | -0.2 to 0.9 | -0.7 to -0.2 | -0.9 to -0.5 |
+| Acoustic & Piano | -0.2 to 0.6 | -0.7 to -0.2 | -0.9 to -0.5 |
 
 **Note:** These ranges represent the typical center of gravity for each genre. Individual mixes can still fall outside — a bright sunny synthwave mix might hit -0.1, and a dark late-night jazz mix might hit -0.5. The thumbnail and context always override the genre defaults.
+
+**Don't hedge toward center.** If the vibe is clearly dark, night, or moody — commit to -0.5 or below. If it's clearly bright, sunny, uplifting — commit to 0.5 or above. A slightly wrong extreme is more useful than a vague center value. Reserve values between -0.2 and 0.2 for genuinely ambiguous mixes only.
 
 ## Genre mapping
 
