@@ -88,6 +88,35 @@
 - [ ] Hit `https://moodmix.yourdomain.com/api/health` → healthy response
 - [ ] Test full flow: sliders → results → play mix
 
+### 6.9 — Automated classifier service (for ongoing catalog growth)
+- [ ] `app/services/classifier_service.py`
+- [ ] Define a `ClassifierStrategy` protocol (abstract interface):
+  ```python
+  class ClassifierStrategy(Protocol):
+      async def classify(self, metadata: MixMetadata) -> ClassificationResult: ...
+  ```
+- [ ] `HaikuClassifier(ClassifierStrategy)` — calls Claude Haiku API
+- [ ] `GptOssClassifier(ClassifierStrategy)` — calls OpenAI OSS GPT-120B API
+- [ ] `ClassifierService` class takes a `ClassifierStrategy` via constructor injection
+- [ ] `classify_mix(mix: Mix) -> ClassificationResult` — delegates to the strategy, parses JSON response
+- [ ] `classify_pending_batch(batch_size: int = 50)` — fetch unclassified mixes, classify each, update DB
+- [ ] Handle LLM response validation (check ranges, check genre slugs exist)
+- [ ] Handle LLM errors gracefully (retry once, then skip and log)
+- [ ] Which strategy to use is determined by `settings.LLM_PROVIDER` config value
+
+> **Pattern: Strategy** — Swapping LLM providers (Haiku ↔ GPT-120B ↔ future models) requires zero changes to `ClassifierService` or any calling code. Just add a new strategy class and update config.
+>
+> **Pattern: Dependency Injection** — `ClassifierService` receives its strategy via constructor, not by instantiating it internally. Makes testing trivial (inject a mock strategy).
+
+### 6.10 — Pipeline scheduler (APScheduler for now, Celery later in sprint 8)
+- [ ] `app/tasks/scheduler.py` — APScheduler setup
+- [ ] Scheduled jobs:
+  - Weekly: crawl all active seed channels
+  - Daily: run 30 keyword searches from a rotating query list
+  - Daily: check availability on random 200 mixes
+  - Daily: classify all pending mixes
+- [ ] Log each run to `pipeline_runs` table
+
 ## Done when
 
 - [ ] `https://moodmix.yourdomain.com` serves the frontend

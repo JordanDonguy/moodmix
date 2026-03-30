@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector  # type: ignore[import-untyped]
-from sqlalchemy import Boolean, Float, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,7 +29,7 @@ class Mix(Base):
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(String))
     duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     thumbnail_url: Mapped[str | None] = mapped_column(String)
-    published_at: Mapped[datetime | None] = mapped_column()
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     view_count: Mapped[int | None] = mapped_column(Integer)
 
     # Mood vector (3D: [mood, energy, instrumentation])

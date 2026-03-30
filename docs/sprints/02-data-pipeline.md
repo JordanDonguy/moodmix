@@ -80,42 +80,16 @@
 scripts/import_classified.py
 ```
 
-### 2.7 — Automated classifier service
-- [ ] `app/services/classifier_service.py`
-- [ ] Define a `ClassifierStrategy` protocol (abstract interface):
-  ```python
-  class ClassifierStrategy(Protocol):
-      async def classify(self, metadata: MixMetadata) -> ClassificationResult: ...
-  ```
-- [ ] `HaikuClassifier(ClassifierStrategy)` — calls Claude Haiku API
-- [ ] `GptOssClassifier(ClassifierStrategy)` — calls OpenAI OSS GPT-120B API
-- [ ] `ClassifierService` class takes a `ClassifierStrategy` via constructor injection
-- [ ] `classify_mix(mix: Mix) -> ClassificationResult` — delegates to the strategy, parses JSON response
-- [ ] `classify_pending_batch(batch_size: int = 50)` — fetch unclassified mixes, classify each, update DB
-- [ ] Handle LLM response validation (check ranges, check genre slugs exist)
-- [ ] Handle LLM errors gracefully (retry once, then skip and log)
-- [ ] Which strategy to use is determined by `settings.LLM_PROVIDER` config value
+### 2.7 — Audio-based chapter detection (for mixes without tracklists)
+- [ ] Script: `scripts/detect_chapters_audio.py`
+- [ ] Download audio stream via `yt-dlp` (audio only, temporary)
+- [ ] Analyze with `pydub` or `librosa` for volume drops / silence gaps
+- [ ] Filter: minimum 2m30s between detected chapters
+- [ ] Store as chapters with generic titles ("Track 1", "Track 2", etc.)
+- [ ] Run on the ~600 mixes that have no chapters from description or comments
+- [ ] Cleanup: delete downloaded audio after processing
 
-> **Pattern: Strategy** — Swapping LLM providers (Haiku ↔ GPT-120B ↔ future models) requires zero changes to `ClassifierService` or any calling code. Just add a new strategy class and update config. This is also **Open/Closed** — open for extension (new providers), closed for modification.
->
-> **Pattern: Dependency Injection** — `ClassifierService` receives its strategy via constructor, not by instantiating it internally. Makes testing trivial (inject a mock strategy).
-
-### 2.8 — Pipeline scheduler (APScheduler for now, Celery later in sprint 8)
-- [ ] `app/tasks/scheduler.py` — APScheduler setup
-- [ ] Scheduled jobs:
-  - Weekly: crawl all active seed channels
-  - Daily: run 30 keyword searches from a rotating query list
-  - Daily: check availability on random 200 mixes
-  - Daily: classify all pending mixes
-- [ ] Log each run to `pipeline_runs` table
-
-**Files created:**
-```
-app/services/crawler_service.py
-app/services/classifier_service.py
-app/tasks/scheduler.py
-data/keyword_queries.json
-```
+**Note:** Doesn't need to be perfect — "good enough" chapters let users skip tracks they don't like, even if boundaries aren't exact. Run before frontend launch.
 
 ## Done when
 

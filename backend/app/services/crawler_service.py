@@ -22,14 +22,9 @@ class CrawlerService:
         self._youtube = youtube_client or YouTubeClient()
 
     async def crawl_channel(self, channel_id: str, max_videos: int = 200) -> tuple[int, int]:
-        """Crawl a channel's uploads. Returns (mixes_found, mixes_added)."""
-        playlist_id = await self._youtube.get_channel_uploads_playlist(channel_id)
-        if not playlist_id:
-            logger.warning("Could not find uploads playlist for channel %s", channel_id)
-            return 0, 0
-
-        video_ids = await self._youtube.get_playlist_video_ids(playlist_id, max_results=max_videos)
-        logger.info("Found %d videos in channel %s", len(video_ids), channel_id)
+        """Crawl a channel for long embeddable music videos. Returns (mixes_found, mixes_added)."""
+        video_ids = await self._youtube.search_channel_videos(channel_id, max_results=max_videos)
+        logger.info("Found %d long embeddable videos in channel %s", len(video_ids), channel_id)
 
         # Filter out videos we already have (in mixes or skipped_videos)
         video_ids = await self._filter_known(video_ids)
@@ -80,18 +75,24 @@ class CrawlerService:
         now = datetime.now(timezone.utc)
         marked = 0
 
-        for yt_id, is_available in availability.items():
-            if not is_available:
-                mix = (await self._db.execute(
-                    select(Mix).where(Mix.youtube_id == yt_id)
-                )).scalar_one_or_none()
+        for yt_id, (is_available, view_count) in availability.items():
+            mix = (await self._db.execute(
+                select(Mix).where(Mix.youtube_id == yt_id)
+            )).scalar_one_or_none()
 
-                if mix:
-                    mix.unavailable_at = now
-                    marked += 1
+            if not mix:
+                continue
+
+            # Update view count
+            mix.view_count = view_count
+
+            # Mark unavailable if needed
+            if not is_available:
+                mix.unavailable_at = now
+                marked += 1
 
         await self._db.commit()
-        logger.info("Checked %d mixes, marked %d as unavailable", len(youtube_ids), marked)
+        logger.info("Checked %d mixes, marked %d as unavailable, view counts updated", len(youtube_ids), marked)
         return len(youtube_ids), marked
 
     async def _filter_known(self, video_ids: list[str]) -> list[str]:
@@ -144,14 +145,15 @@ class CrawlerService:
         logger.info("Inserted %d new mixes", added)
         return added
 
-    async def _insert_skipped(self, skipped: dict[str, str]) -> None:
-        """Record skipped video IDs with their rejection reason."""
+    async def _insert_skipped(self, skipped: dict[str, tuple[str, str | None]]) -> None:
+        """Record skipped video IDs with their rejection reason and title."""
         if not skipped:
             return
 
-        for youtube_id, reason in skipped.items():
+        for youtube_id, (reason, title) in skipped.items():
             stmt = insert(SkippedVideo).values(
                 youtube_id=youtube_id,
+                title=title,
                 reason=reason,
             ).on_conflict_do_nothing(index_elements=["youtube_id"])
             await self._db.execute(stmt)
