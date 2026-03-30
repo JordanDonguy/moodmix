@@ -1,6 +1,9 @@
 # OS
 .DS_Store
 
+# DB backups
+backend/data/backup_*.sql
+
 # IDE
 .idea/
 .vscode/
