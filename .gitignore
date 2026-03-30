@@ -4,6 +4,15 @@
 # DB backups
 backend/data/backup_*.sql
 
+# Generated data files
+backend/data/pending_batches/
+backend/data/classified_batches/
+backend/data/classified_batches_legacy/
+
+# Test thumbnails
+thumbnail*.png
+thumbnail*.jpg
+
 # IDE
 .idea/
 .vscode/
