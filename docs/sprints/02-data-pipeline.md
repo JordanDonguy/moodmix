@@ -39,14 +39,14 @@
 - [x] Inline editing of mood, energy, instrumentation, genres, has_vocals, validated
 
 ## PR 2c — Initial crawl run
-- [ ] Run crawler on all seed channels
-- [ ] Verify: mixes appear in `mixes` table with `mood_vector = NULL` (pending classification)
-- [ ] Target: ~1,000 unclassified mixes
+- [x] Run crawler on all seed channels
+- [x] Verify: mixes appear in `mixes` table with `mood_vector = NULL` (pending classification)
+- [x] Target: ~1,000 unclassified mixes
 
 ## PR 2d — Classification pipeline
 
 ### 2.6 — Export for Claude Code classification
-- [ ] Write a script that exports pending mixes as JSON:
+- [x] Write a script that exports pending mixes as JSON:
   ```json
   [
     {
@@ -60,20 +60,20 @@
     }
   ]
   ```
-- [ ] Export to `data/pending_mixes_batch_001.json` (batches of ~50-100)
-- [ ] Include thumbnail_url — used by Claude Code for mood classification (dark/bright axis)
+- [x] Export to `data/pending_mixes_batch_001.json` (batches of ~50-100)
+- [x] Include thumbnail_url — used by Claude Code for mood classification (dark/bright axis)
 
 ### 2.7 — Claude Code classification (manual, batched)
-- [ ] Open Claude Code, feed it a batch JSON
-- [ ] Prompt includes: title, channel, description, tags, thumbnail image
-- [ ] Output: classified JSON with mood vectors, genres, has_vocals, confidence
-- [ ] Repeat for all batches until initial seed is classified
+- [x] Open Claude Code, feed it a batch JSON
+- [x] Prompt includes: title, channel, description, tags, thumbnail image
+- [x] Output: classified JSON with mood vectors, genres, has_vocals, confidence
+- [x] Repeat for all batches until initial seed is classified
 
 ### 2.6 — Import classified results
-- [ ] Write a script that reads classified JSON and updates mixes in DB:
+- [x] Write a script that reads classified JSON and updates mixes in DB:
   - Set mood_vector, mood, energy, instrumentation, has_vocals, classification_confidence
   - Insert into mix_genres (lookup genre by slug)
-- [ ] Verify: spot-check 20 random mixes for reasonable values
+- [x] Verify: spot-check 20 random mixes for reasonable values
 
 **Files created:**
 ```
@@ -93,10 +93,10 @@ scripts/import_classified.py
 
 ## Done when
 
-- [ ] Seed channels are in DB
-- [ ] Initial crawl produces 2,000+ mixes in `mixes` table
-- [ ] Claude Code classification completes on initial seed
-- [ ] Import script populates mood_vector, genres, has_vocals for all classified mixes
-- [ ] Automated classifier works on a test batch of 10 pending mixes
-- [ ] Scheduler runs without errors (test each job manually first)
+- [x] Seed channels are in DB
+- [x] Initial crawl produces 2,000+ mixes in `mixes` table
+- [x] Claude Code classification completes on initial seed
+- [x] Import script populates mood_vector, genres, has_vocals for all classified mixes
+- [x] Automated classifier works on a test batch of 10 pending mixes
+- [x] Scheduler runs without errors (test each job manually first)
 - [ ] `pipeline_runs` table has entries for each job type

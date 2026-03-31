@@ -92,6 +92,12 @@ async def import_classified(file_path: Path) -> None:
                 print(f"  ⚠ {w}")
 
 
+async def run_all(files: list[Path]) -> None:
+    for f in files:
+        print(f"--- {f.name} ---")
+        await import_classified(f)
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         # Default: import all files from classified_batches/
@@ -101,9 +107,7 @@ if __name__ == "__main__":
             print(f"No JSON files found in {CLASSIFIED_DIR}")
             sys.exit(1)
         print(f"Found {len(files)} classified batch files\n")
-        for f in files:
-            print(f"--- {f.name} ---")
-            asyncio.run(import_classified(f))
+        asyncio.run(run_all(files))
     else:
         file_path = Path(sys.argv[1])
         if not file_path.exists():

@@ -7,20 +7,20 @@
 ## Tasks
 
 ### 3.1 — Pydantic schemas
-- [ ] `app/schemas/mix.py`
+- [x] `app/schemas/mix.py`
   - `MixResponse` — what the frontend receives per mix (id, youtube_id, title, channel_name, thumbnail_url, duration_seconds, mood, energy, instrumentation, has_vocals, genres list)
   - `MixSearchResponse` — `{ mixes: list[MixResponse], total: int, limit: int, offset: int }`
-- [ ] `app/schemas/genre.py`
+- [x] `app/schemas/genre.py`
   - `GenreResponse` — id, name, slug
-- [ ] `app/schemas/search.py`
+- [x] `app/schemas/search.py`
   - `AiSearchRequest` — `{ query: str }`
   - `AiSearchResponse` — extends MixSearchResponse + `inferred` object (mood, energy, instrumentation, genres, instrumental)
-- [ ] `app/schemas/admin.py`
+- [x] `app/schemas/admin.py`
   - `TriggerCrawlRequest` — `{ type: str }` (channel_crawl | keyword_search | availability_check)
   - `AddChannelRequest` — `{ channel_id: str, channel_name: str }`
   - `UpdateChannelRequest` — `{ active: bool }`
   - `ChannelResponse`, `PipelineStatusResponse`
-- [ ] `app/schemas/common.py`
+- [x] `app/schemas/common.py`
   - `ErrorResponse` — `{ error: str, status: int, timestamp: str }`
 
 > **Pattern: Interface Segregation (via DTOs)** — Each consumer gets a tailored schema. The frontend sees `MixResponse` (no description, no tags, no internal fields). Admin sees `PipelineStatusResponse`. DB models are never exposed directly — Pydantic schemas are the API contract.
@@ -37,28 +37,28 @@ app/schemas/
 ```
 
 ### 3.2 — Mix service
-- [ ] `app/services/mix_service.py`
-- [ ] `search_mixes(session, mood, energy, instrumentation, genres, instrumental, limit, offset)` — pgvector cosine similarity query with filters
-- [ ] `get_mix_by_id(session, mix_id)` — single mix lookup
-- [ ] `report_unavailable(session, mix_id)` — set unavailable_at, nullify mood_vector so it drops from search
-- [ ] Test query manually: verify results are ordered by mood similarity
+- [x] `app/services/mix_service.py`
+- [x] `search_mixes(session, mood, energy, instrumentation, genres, instrumental, limit, offset)` — pgvector cosine similarity query with filters
+- [x] `get_mix_by_id(session, mix_id)` — single mix lookup
+- [x] `report_unavailable(session, mix_id)` — set unavailable_at, nullify mood_vector so it drops from search
+- [x] Test query manually: verify results are ordered by mood similarity
 
 > **Pattern: Repository-like service layer** — `MixService` encapsulates all DB query logic. Routers never write SQL or touch SQLAlchemy directly — they call service methods. This keeps routers thin (just HTTP concerns: parse params, call service, return response) and services testable independently.
 
 ### 3.3 — Genres router
-- [ ] `app/routers/genres.py`
-- [ ] `GET /api/genres` — return all genres
-- [ ] Test via Swagger UI
+- [x] `app/routers/genres.py`
+- [x] `GET /api/genres` — return all genres
+- [x] Test via Swagger UI
 
 ### 3.4 — Mixes router
-- [ ] `app/routers/mixes.py`
-- [ ] `GET /api/mixes/search` — query params: mood, energy, instrumentation, genres (comma-sep), instrumental (bool), limit, offset
+- [x] `app/routers/mixes.py`
+- [x] `GET /api/mixes/search` — query params: mood, energy, instrumentation, genres (comma-sep), instrumental (bool), limit, offset
   - Validate ranges (-1 to 1 for mood params, 1-50 for limit)
   - Call `mix_service.search_mixes()`
   - Return `MixSearchResponse`
-- [ ] `GET /api/mixes/{id}` — single mix
-- [ ] `POST /api/mixes/{id}/report-unavailable` — mark unavailable
-- [ ] Test all via Swagger UI with various param combos
+- [x] `GET /api/mixes/{id}` — single mix
+- [x] `POST /api/mixes/{id}/report-unavailable` — mark unavailable
+- [x] Test all via Swagger UI with various param combos
 
 ### 3.5 — AI search service + endpoint
 - [ ] `app/services/ai_search_service.py`
