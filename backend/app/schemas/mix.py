@@ -1,6 +1,9 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+from app.schemas.genre import GenreResponse
 
 
 class Chapter(BaseModel):
@@ -36,9 +39,9 @@ class ClassificationResult(BaseModel):
 
 
 class MixResponse(BaseModel):
-    """API response shape for a single mix."""
+    """API response shape for a single mix — what the frontend receives."""
 
-    id: str
+    id: UUID
     youtube_id: str
     title: str
     channel_name: str | None
@@ -48,8 +51,17 @@ class MixResponse(BaseModel):
     energy: float | None
     instrumentation: float | None
     has_vocals: bool | None
-    genres: list[str]
+    genres: list[GenreResponse]
     chapters: list[Chapter] | None
 
     class Config:
         from_attributes = True
+
+
+class MixSearchResponse(BaseModel):
+    """Paginated search results."""
+
+    mixes: list[MixResponse]
+    total: int
+    limit: int
+    offset: int
