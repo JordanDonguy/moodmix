@@ -100,6 +100,35 @@ GET {{base}}/api/mixes/search?genres=lo-fi,hip-hop&limit=5
 
 
 # ─────────────────────────────────────────
+# AI Search (rate limited: 5/min)
+# ─────────────────────────────────────────
+
+### Rainy day coffee shop
+POST {{base}}/api/mixes/ai-search
+Content-Type: application/json
+
+{"query": "rainy day coffee shop vibes"}
+
+### Dark electronic for coding
+POST {{base}}/api/mixes/ai-search
+Content-Type: application/json
+
+{"query": "dark electronic music for late night coding"}
+
+### Sunny morning
+POST {{base}}/api/mixes/ai-search
+Content-Type: application/json
+
+{"query": "chill sunny café"}
+
+### Chill piano
+POST {{base}}/api/mixes/ai-search
+Content-Type: application/json
+
+{"query": "peaceful piano music for reading"}
+
+
+# ─────────────────────────────────────────
 # Single mix + report unavailable
 # ─────────────────────────────────────────
 
