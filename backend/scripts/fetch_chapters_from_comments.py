@@ -8,7 +8,7 @@ from app.database import async_session
 from app.models.mix import Mix
 from app.services.youtube_client import YouTubeClient
 
-SKIP_CHANNELS = ["chilli music", "A Lofi Soul", "Afro Lofi"]
+SKIP_CHANNELS = ["chilli music", "A Lofi Soul", "Afro Lofi", "Anjunadeep", "Coffee Shop Vibes", "Fluidified", "College Music", "Chillhop Music", "Lofi Girl", "Starburst", "Devs FM"]
 
 
 async def fetch_chapters() -> None:
