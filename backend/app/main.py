@@ -9,7 +9,7 @@ from app.admin import setup_admin
 from app.config import settings
 from app.database import engine
 from app.exceptions import AppException
-from app.routers import admin, health
+from app.routers import admin, genres, health, mixes
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,8 @@ async def app_exception_handler(request: Request, exc: AppException):
 
 # Routers
 app.include_router(health.router)
+app.include_router(genres.router)
+app.include_router(mixes.router)
 app.include_router(admin.router)
 
 # Admin panel
