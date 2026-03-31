@@ -1,0 +1,126 @@
+### MoodMix API — Manual tests
+### Requires REST Client extension in VSCode (or JetBrains HTTP client)
+
+@base = http://localhost:8000
+@admin_key = 2cd3da40fe2960f184a0d2a764adcb43d5b9eeb0377a334901476c7f8d08de1f
+
+# ─────────────────────────────────────────
+# Health
+# ─────────────────────────────────────────
+
+### Health check
+GET {{base}}/api/health
+
+
+# ─────────────────────────────────────────
+# Genres
+# ─────────────────────────────────────────
+
+### Get all genres
+GET {{base}}/api/genres
+
+
+# ─────────────────────────────────────────
+# Search — 0 sliders (random browse)
+# ─────────────────────────────────────────
+
+### Random mixes, no filters
+GET {{base}}/api/mixes/search?limit=5
+
+### Random — jazz only
+GET {{base}}/api/mixes/search?genres=jazz&limit=5
+
+### Random — instrumental only
+GET {{base}}/api/mixes/search?instrumental=true&limit=5
+
+### Random — page 2 (stable order with seed)
+GET {{base}}/api/mixes/search?seed=0.42&limit=5&offset=5
+
+
+# ─────────────────────────────────────────
+# Search — 1 slider
+# ─────────────────────────────────────────
+
+### Dark only
+GET {{base}}/api/mixes/search?mood=-0.7&limit=5
+
+### Bright only
+GET {{base}}/api/mixes/search?mood=0.7&limit=5
+
+### Very chill only
+GET {{base}}/api/mixes/search?energy=-0.8&limit=5
+
+### Electronic only
+GET {{base}}/api/mixes/search?instrumentation=0.7&limit=5
+
+
+# ─────────────────────────────────────────
+# Search — 2 sliders
+# ─────────────────────────────────────────
+
+### Dark + chill
+GET {{base}}/api/mixes/search?mood=-0.6&energy=-0.5&limit=5
+
+### Bright + organic
+GET {{base}}/api/mixes/search?mood=0.6&instrumentation=-0.6&limit=5
+
+
+# ─────────────────────────────────────────
+# Search — 3 sliders (full vector search)
+# ─────────────────────────────────────────
+
+### Dark + chill + electronic (synthwave / dark ambient vibes)
+GET {{base}}/api/mixes/search?mood=-0.7&energy=-0.5&instrumentation=0.7&limit=20
+
+### Bright + chill + organic (café jazz / bossa nova)
+GET {{base}}/api/mixes/search?mood=0.7&energy=-0.5&instrumentation=-0.6&limit=20
+
+### Neutral + dynamic + electronic (deep house)
+GET {{base}}/api/mixes/search?mood=0.0&energy=0&instrumentation=0.6&limit=20
+
+### Dark + dynamic + electronic (drum & bass)
+GET {{base}}/api/mixes/search?mood=-0.5&energy=0.7&instrumentation=0.6&limit=20
+
+
+# ─────────────────────────────────────────
+# Search — genre + sliders combined
+# ─────────────────────────────────────────
+
+### Lo-Fi, dark, chill
+GET {{base}}/api/mixes/search?mood=-0.3&energy=-0.5&genres=lo-fi&limit=5
+
+### Jazz, bright, organic
+GET {{base}}/api/mixes/search?mood=0.5&instrumentation=-0.6&genres=jazz&limit=5
+
+### Ambient, very dark
+GET {{base}}/api/mixes/search?mood=-0.7&energy=-0.8&genres=ambient&limit=5
+
+### Multiple genres
+GET {{base}}/api/mixes/search?genres=lo-fi,hip-hop&limit=5
+
+
+# ─────────────────────────────────────────
+# Single mix + report unavailable
+# ─────────────────────────────────────────
+
+### Get single mix (replace with a real ID from a search result)
+GET {{base}}/api/mixes/00000000-0000-0000-0000-000000000000
+
+### Report mix as unavailable
+POST {{base}}/api/mixes/00000000-0000-0000-0000-000000000000/report-unavailable
+
+
+# ─────────────────────────────────────────
+# Admin endpoints
+# ─────────────────────────────────────────
+
+### Trigger channel crawl
+POST {{base}}/api/admin/crawl/channel
+X-API-Key: {{admin_key}}
+Content-Type: application/json
+
+{
+  "channel_id": "UCRmBxxF1eCDIjyG10P_mRiw",
+  "channel_name": "Starburst",
+  "max_videos": 10
+}
