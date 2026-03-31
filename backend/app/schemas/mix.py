@@ -65,3 +65,27 @@ class MixSearchResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class AiSearchRequest(BaseModel):
+    """Natural language search query."""
+
+    query: str = Field(min_length=2, max_length=500)
+
+
+class AiSearchInferred(BaseModel):
+    """Values inferred by the AI from the natural language query."""
+
+    mood: float | None
+    energy: float | None
+    instrumentation: float | None
+    genres: list[str]
+    instrumental: bool
+
+
+class AiSearchResponse(BaseModel):
+    """AI search results — includes inferred slider values so frontend can update UI."""
+
+    inferred: AiSearchInferred
+    mixes: list[MixResponse]
+    total: int
