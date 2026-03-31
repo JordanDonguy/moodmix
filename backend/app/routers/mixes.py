@@ -1,15 +1,29 @@
+import logging
 import random
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.exceptions import MixNotFoundException
-from app.schemas.mix import MixResponse, MixSearchResponse
+from app.exceptions import AppException, MixNotFoundException
+from app.schemas.mix import (
+    AiSearchInferred,
+    AiSearchRequest,
+    AiSearchResponse,
+    MixResponse,
+    MixSearchResponse,
+)
+from app.services.ai_search_service import AiSearchService
 from app.services.mix_service import MixService
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/mixes", tags=["mixes"])
+
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.get("/search", response_model=MixSearchResponse)
@@ -44,6 +58,53 @@ async def search_mixes(
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.post("/ai-search", response_model=AiSearchResponse)
+@limiter.limit("5/minute")  # type: ignore[misc]
+async def ai_search(
+    request: Request,  # required by slowapi for IP extraction
+    body: AiSearchRequest,
+    db: AsyncSession = Depends(get_db),
+) -> AiSearchResponse:
+    """Natural language search. LLM converts text to mood values, then searches."""
+    ai_service = AiSearchService()
+
+    try:
+        inferred = await ai_service.parse_query(body.query)
+    except Exception as e:
+        logger.error("AI search failed: %s: %s", type(e).__name__, e)
+        raise AppException("AI search temporarily unavailable", 503) from e
+    finally:
+        await ai_service.close()
+
+    # Use inferred values to search
+    genre_list = inferred.get("genres", [])
+    instrumental = bool(inferred.get("instrumental", False))
+
+    service = MixService(db)
+    mixes, total = await service.search_mixes(
+        mood=inferred.get("mood"),  # type: ignore[arg-type]
+        energy=inferred.get("energy"),  # type: ignore[arg-type]
+        instrumentation=inferred.get("instrumentation"),  # type: ignore[arg-type]
+        genres=genre_list if genre_list else None,  # type: ignore[arg-type]
+        instrumental=instrumental,
+        seed=round(random.random(), 4),
+        limit=20,
+        offset=0,
+    )
+
+    return AiSearchResponse(
+        inferred=AiSearchInferred(
+            mood=inferred.get("mood"),  # type: ignore[arg-type]
+            energy=inferred.get("energy"),  # type: ignore[arg-type]
+            instrumentation=inferred.get("instrumentation"),  # type: ignore[arg-type]
+            genres=genre_list,  # type: ignore[arg-type]
+            instrumental=instrumental,
+        ),
+        mixes=[MixResponse.model_validate(m) for m in mixes],
+        total=total,
     )
 
 
