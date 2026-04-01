@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  /* Dark theme (default) — YouTube-like */
   --color-bg-primary: #0f0f0f;
   --color-bg-secondary: #212121;
   --color-bg-elevated: #272727;
@@ -13,21 +14,35 @@
 }
 
 @layer base {
-  html {
-    color-scheme: dark;
-  }
+	html {
+		color-scheme: dark;
+	}
 
-  body {
-    background-color: var(--color-bg-primary);
-    color: var(--color-text-primary);
-    font-family: "Roboto", Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+	/* Light theme overrides */
+	html:not(.dark) {
+		color-scheme: light;
+		--color-bg-primary: #ffffff;
+		--color-bg-secondary: #f2f2f2;
+		--color-bg-elevated: #e5e5e5;
+		--color-text-primary: #0f0f0f;
+		--color-text-secondary: #606060;
+		--color-text-muted: #909090;
+		--color-border: #e0e0e0;
+		--color-accent: #ff0000;
+		--color-accent-hover: #cc0000;
+	}
 
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+	body {
+		background-color: var(--color-bg-primary);
+		color: var(--color-text-primary);
+		font-family: "Roboto", Arial, sans-serif;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+
+	* {
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0;
+	}
 }
