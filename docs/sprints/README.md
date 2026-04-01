@@ -7,9 +7,9 @@
 | [01](01-fastapi-foundation.md) | FastAPI Foundation | — | Project scaffold, DB schema, models, config, error handling |
 | [02](02-data-pipeline.md) | Data Pipeline | 01 | YouTube crawler, initial seed classification, automated classifier |
 | [03](03-api-layer.md) | API Layer | 02 | All REST endpoints, auth, rate limiting |
-| [04](04-testing.md) | Testing | 03 | Unit + integration + DB tests |
-| [05](05-frontend-mvp.md) | Frontend MVP | 03 | React app, sliders, grid, player, AI search |
-| [06](06-deployment.md) | Deployment | 05 | Docker, CI/CD, nginx, SSL |
+| [04](04-frontend-mvp.md) | Frontend MVP | 03 | React app, sliders, grid, player, AI search |
+| [05](05-testing.md) | Testing | 04 | Unit + integration + DB tests |
+| [06](06-deployment.md) | Deployment | 04 | Docker, CI/CD, nginx, SSL |
 
 ## Enhancements (Sprints 7-10)
 

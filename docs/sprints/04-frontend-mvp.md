@@ -1,4 +1,4 @@
-# Sprint 5 — Frontend MVP
+# Sprint 4 — Frontend MVP
 
 **Goal:** Functional React app where users can search mixes via sliders/genres/AI and play them with a persistent player bar.
 
