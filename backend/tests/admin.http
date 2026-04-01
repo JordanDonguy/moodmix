@@ -1,0 +1,69 @@
+### MoodMix — Admin endpoints (require X-API-Key)
+@base = http://localhost:8000
+@admin_key = {{$dotenv ADMIN_API_KEY}}
+
+
+# ─────────────────────────────────────────
+# Crawl
+# ─────────────────────────────────────────
+
+### Trigger channel crawl
+POST {{base}}/api/admin/crawl/channel
+X-API-Key: {{admin_key}}
+Content-Type: application/json
+
+{
+  "channel_id": "UCRmBxxF1eCDIjyG10P_mRiw",
+  "channel_name": "Starburst",
+  "max_videos": 10
+}
+
+### Keyword search crawl
+POST {{base}}/api/admin/crawl/search?query=1+hour+lo-fi+study+mix&max_results=10
+X-API-Key: {{admin_key}}
+
+
+# ─────────────────────────────────────────
+# Channels
+# ─────────────────────────────────────────
+
+### List all seed channels
+GET {{base}}/api/admin/channels
+X-API-Key: {{admin_key}}
+
+### Register a new channel (without crawling)
+POST {{base}}/api/admin/channels
+X-API-Key: {{admin_key}}
+Content-Type: application/json
+
+{
+  "channel_id": "UCRmBxxF1eCDIjyG10P_mRiw",
+  "channel_name": "Starburst"
+}
+
+### Deactivate a channel
+PATCH {{base}}/api/admin/channels/UCRmBxxF1eCDIjyG10P_mRiw
+X-API-Key: {{admin_key}}
+Content-Type: application/json
+
+{"active": false}
+
+### Reactivate a channel
+PATCH {{base}}/api/admin/channels/UCRmBxxF1eCDIjyG10P_mRiw
+X-API-Key: {{admin_key}}
+Content-Type: application/json
+
+{"active": true}
+
+
+# ─────────────────────────────────────────
+# Pipeline status
+# ─────────────────────────────────────────
+
+### Recent pipeline runs
+GET {{base}}/api/admin/pipeline/status
+X-API-Key: {{admin_key}}
+
+### Last 5 pipeline runs
+GET {{base}}/api/admin/pipeline/status?limit=5
+X-API-Key: {{admin_key}}

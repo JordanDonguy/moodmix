@@ -1,0 +1,26 @@
+### MoodMix — AI Search (rate limited: 5/min)
+@base = http://localhost:8000
+
+### Rainy day coffee shop
+POST {{base}}/api/mixes/ai-search
+Content-Type: application/json
+
+{"query": "rainy day coffee shop vibes"}
+
+### Dark electronic for coding
+POST {{base}}/api/mixes/ai-search
+Content-Type: application/json
+
+{"query": "dark electronic music for late night coding"}
+
+### Sunny morning
+POST {{base}}/api/mixes/ai-search
+Content-Type: application/json
+
+{"query": "chill sunny café"}
+
+### Chill piano
+POST {{base}}/api/mixes/ai-search
+Content-Type: application/json
+
+{"query": "peaceful piano music for reading"}

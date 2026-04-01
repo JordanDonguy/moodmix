@@ -1,0 +1,5 @@
+### MoodMix — Genres
+@base = http://localhost:8000
+
+### Get all genres
+GET {{base}}/api/genres

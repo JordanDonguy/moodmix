@@ -21,7 +21,7 @@ class CrawlerService:
         self._db = db
         self._youtube = youtube_client or YouTubeClient()
 
-    async def crawl_channel(self, channel_id: str, max_videos: int = 200) -> tuple[int, int]:
+    async def crawl_channel(self, channel_id: str, channel_name: str | None = None, max_videos: int = 200) -> tuple[int, int]:
         """Crawl a channel for long embeddable music videos. Returns (mixes_found, mixes_added)."""
         video_ids = await self._youtube.search_channel_videos(channel_id, max_results=max_videos)
         logger.info("Found %d long embeddable videos in channel %s", len(video_ids), channel_id)
@@ -30,6 +30,7 @@ class CrawlerService:
         video_ids = await self._filter_known(video_ids)
         if not video_ids:
             logger.info("No new videos to process for channel %s", channel_id)
+            await self._update_seed_channel(channel_id, channel_name, 0)
             return 0, 0
 
         logger.info("Fetching details for %d new videos", len(video_ids))
@@ -39,8 +40,8 @@ class CrawlerService:
         added = await self._insert_mixes(mixes)
         await self._insert_skipped(skipped)
 
-        # Update seed channel stats
-        await self._update_seed_channel(channel_id, added)
+        # Upsert seed channel record with updated stats
+        await self._update_seed_channel(channel_id, channel_name, added)
 
         return len(mixes), added
 
@@ -161,14 +162,25 @@ class CrawlerService:
         await self._db.commit()
         logger.debug("Recorded %d skipped videos", len(skipped))
 
-    async def _update_seed_channel(self, channel_id: str, mixes_added: int) -> None:
-        """Update seed channel stats after a crawl."""
-        result = await self._db.execute(
-            select(SeedChannel).where(SeedChannel.channel_id == channel_id)
-        )
-        channel = result.scalar_one_or_none()
+    async def _update_seed_channel(self, channel_id: str, channel_name: str | None, mixes_added: int) -> None:
+        """Upsert seed channel record and update crawl stats."""
+        now = datetime.now(timezone.utc)
+        set_dict: dict[str, object] = {
+            "last_crawled_at": now,
+            "total_mixes_found": SeedChannel.__table__.c.total_mixes_found + mixes_added,
+        }
+        if channel_name:
+            set_dict["channel_name"] = channel_name
 
-        if channel:
-            channel.last_crawled_at = datetime.now(timezone.utc)
-            channel.total_mixes_found = channel.total_mixes_found + mixes_added
-            await self._db.commit()
+        stmt = (
+            insert(SeedChannel)
+            .values(
+                channel_id=channel_id,
+                channel_name=channel_name or channel_id,
+                last_crawled_at=now,
+                total_mixes_found=mixes_added,
+            )
+            .on_conflict_do_update(index_elements=["channel_id"], set_=set_dict)
+        )
+        await self._db.execute(stmt)
+        await self._db.commit()

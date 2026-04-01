@@ -1,23 +1,5 @@
-### MoodMix API — Manual tests
-### Requires REST Client extension in VSCode (or JetBrains HTTP client)
-
+### MoodMix — Mixes search + single mix
 @base = http://localhost:8000
-@admin_key = 2cd3da40fe2960f184a0d2a764adcb43d5b9eeb0377a334901476c7f8d08de1f
-
-# ─────────────────────────────────────────
-# Health
-# ─────────────────────────────────────────
-
-### Health check
-GET {{base}}/api/health
-
-
-# ─────────────────────────────────────────
-# Genres
-# ─────────────────────────────────────────
-
-### Get all genres
-GET {{base}}/api/genres
 
 
 # ─────────────────────────────────────────
@@ -100,35 +82,6 @@ GET {{base}}/api/mixes/search?genres=lo-fi,hip-hop&limit=5
 
 
 # ─────────────────────────────────────────
-# AI Search (rate limited: 5/min)
-# ─────────────────────────────────────────
-
-### Rainy day coffee shop
-POST {{base}}/api/mixes/ai-search
-Content-Type: application/json
-
-{"query": "rainy day coffee shop vibes"}
-
-### Dark electronic for coding
-POST {{base}}/api/mixes/ai-search
-Content-Type: application/json
-
-{"query": "dark electronic music for late night coding"}
-
-### Sunny morning
-POST {{base}}/api/mixes/ai-search
-Content-Type: application/json
-
-{"query": "chill sunny café"}
-
-### Chill piano
-POST {{base}}/api/mixes/ai-search
-Content-Type: application/json
-
-{"query": "peaceful piano music for reading"}
-
-
-# ─────────────────────────────────────────
 # Single mix + report unavailable
 # ─────────────────────────────────────────
 
@@ -137,19 +90,3 @@ GET {{base}}/api/mixes/00000000-0000-0000-0000-000000000000
 
 ### Report mix as unavailable
 POST {{base}}/api/mixes/00000000-0000-0000-0000-000000000000/report-unavailable
-
-
-# ─────────────────────────────────────────
-# Admin endpoints
-# ─────────────────────────────────────────
-
-### Trigger channel crawl
-POST {{base}}/api/admin/crawl/channel
-X-API-Key: {{admin_key}}
-Content-Type: application/json
-
-{
-  "channel_id": "UCRmBxxF1eCDIjyG10P_mRiw",
-  "channel_name": "Starburst",
-  "max_videos": 10
-}
