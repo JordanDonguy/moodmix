@@ -9,13 +9,15 @@
   --color-text-secondary: #aaaaaa;
   --color-text-muted: #717171;
   --color-border: #303030;
-  --color-accent: #ff0000;
-  --color-accent-hover: #cc0000;
+  --color-accent: #ff0034;
+  --color-accent-hover: #cc002a;
+	--color-scrollbar: #4d4d4d;
 }
 
 @layer base {
 	html {
 		color-scheme: dark;
+		scroll-behavior: smooth;
 	}
 
 	/* Light theme overrides */
@@ -30,6 +32,7 @@
 		--color-border: #e0e0e0;
 		--color-accent: #ff0000;
 		--color-accent-hover: #cc0000;
+		--color-scrollbar: #d1d1d1;
 	}
 
 	body {
@@ -45,4 +48,42 @@
 		margin: 0;
 		padding: 0;
 	}
+
+	/* Scrollbar styles */
+	::-webkit-scrollbar {
+		width: 8px;
+	}
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	::-webkit-scrollbar-thumb {
+		background: var(--color-scrollbar);
+		border-radius: 4px;
+	}
+	::-webkit-scrollbar-thumb:hover {
+		background: var(--color-text-muted);
+	}
+
+	/* Firefox */
+	html {
+		scrollbar-width: thin;
+		scrollbar-color: var(--color-scrollbar) transparent;
+	}
+}
+
+@layer utilities {
+	.fade-in {
+		animation: fade-in 0.2s ease-in;
+	}
+
+	.scrollbar-hide {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+		&::-webkit-scrollbar { display: none; }
+	}
+}
+
+@keyframes fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
 }

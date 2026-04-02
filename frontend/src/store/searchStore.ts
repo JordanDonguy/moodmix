@@ -17,6 +17,7 @@ interface SearchState {
 	clearGenres: () => void;
 	setInstrumental: (v: boolean) => void;
 	applyAiInferred: (inferred: AiSearchInferred) => void;
+	resetAll: () => void;
 	resetSeed: () => void;
 }
 
@@ -30,18 +31,17 @@ export const useSearchStore = create<SearchState>()(
 			instrumental: false,
 			seed: Math.round(Math.random() * 10000) / 10000,
 
-			setMood: (v) => set({ mood: v, seed: newSeed() }),
-			setEnergy: (v) => set({ energy: v, seed: newSeed() }),
-			setInstrumentation: (v) => set({ instrumentation: v, seed: newSeed() }),
+			setMood: (v) => set({ mood: v }),
+			setEnergy: (v) => set({ energy: v }),
+			setInstrumentation: (v) => set({ instrumentation: v }),
 			toggleGenre: (slug) =>
 				set((s) => ({
 					genres: s.genres.includes(slug)
 						? s.genres.filter((g) => g !== slug)
 						: [...s.genres, slug],
-					seed: newSeed(),
 				})),
-			clearGenres: () => set({ genres: [], seed: newSeed() }),
-			setInstrumental: (v) => set({ instrumental: v, seed: newSeed() }),
+			clearGenres: () => set({ genres: [] }),
+			setInstrumental: (v) => set({ instrumental: v }),
 			applyAiInferred: (inferred) =>
 				set({
 					mood: inferred.mood,
@@ -49,7 +49,14 @@ export const useSearchStore = create<SearchState>()(
 					instrumentation: inferred.instrumentation,
 					genres: inferred.genres,
 					instrumental: inferred.instrumental,
-					seed: newSeed(),
+				}),
+			resetAll: () =>
+				set({
+					mood: null,
+					energy: null,
+					instrumentation: null,
+					genres: [],
+					instrumental: false,
 				}),
 			resetSeed: () => set({ seed: newSeed() }),
 		}),
