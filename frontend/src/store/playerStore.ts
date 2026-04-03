@@ -53,29 +53,28 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 		const { queue, queueIndex } = get();
 		const nextIdx = queueIndex + 1;
 		if (nextIdx < queue.length) {
+			const mix = queue[nextIdx];
 			set({
-				currentMix: queue[nextIdx],
+				currentMix: mix,
 				queueIndex: nextIdx,
 				isPlaying: true,
 				currentTime: 0,
+				duration: mix.duration_seconds,
 			});
 		}
 	},
 
 	prev: () => {
-		const { queue, queueIndex, currentTime } = get();
-		// If more than 3s in, restart current; otherwise go to previous
-		if (currentTime > 3) {
-			set({ currentTime: 0, pendingSeek: 0 });
-			return;
-		}
+		const { queue, queueIndex } = get();
 		const prevIdx = queueIndex - 1;
 		if (prevIdx >= 0) {
+			const mix = queue[prevIdx];
 			set({
-				currentMix: queue[prevIdx],
+				currentMix: mix,
 				queueIndex: prevIdx,
 				isPlaying: true,
 				currentTime: 0,
+				duration: mix.duration_seconds,
 			});
 		}
 	},
