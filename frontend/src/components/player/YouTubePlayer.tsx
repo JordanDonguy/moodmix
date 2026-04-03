@@ -129,7 +129,7 @@ export default function YouTubePlayer() {
 		}
 	}, [isPlaying, currentMix, startTracking, stopTracking]);
 
-	// Media Session API — hardware media keys + OS media controls
+	// OS media controls
 	useEffect(() => {
 		if (!("mediaSession" in navigator)) return;
 		navigator.mediaSession.setActionHandler("play", () =>
@@ -152,7 +152,6 @@ export default function YouTubePlayer() {
 		};
 	}, []);
 
-	// Keep OS media controls metadata in sync
 	useEffect(() => {
 		if (!("mediaSession" in navigator)) return;
 		if (!currentMix) {
@@ -174,7 +173,6 @@ export default function YouTubePlayer() {
 		});
 	}, [currentMix]);
 
-	// Keep OS playback state in sync
 	useEffect(() => {
 		if (!("mediaSession" in navigator)) return;
 		navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
