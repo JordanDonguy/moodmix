@@ -14,29 +14,18 @@ function useDocumentTitle() {
 	}, [currentMix]);
 }
 
-function useMediaKeys() {
+function useSpacebarPlayPause() {
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
-			const store = usePlayerStore.getState();
-			if (e.code === "Space") {
-				const tag = (e.target as HTMLElement).tagName;
-				if (tag === "INPUT" || tag === "TEXTAREA") return;
-				e.preventDefault();
-				if (!store.currentMix) return;
-				if (store.isPlaying) store.pause();
-				else store.resume();
-			} else if (e.code === "MediaTrackNext") {
-				e.preventDefault();
-				store.next();
-			} else if (e.code === "MediaTrackPrevious") {
-				e.preventDefault();
-				store.prev();
-			} else if (e.code === "MediaPlayPause") {
-				e.preventDefault();
-				if (!store.currentMix) return;
-				if (store.isPlaying) store.pause();
-				else store.resume();
-			}
+			if (e.code !== "Space") return;
+			const tag = (e.target as HTMLElement).tagName;
+			if (tag === "INPUT" || tag === "TEXTAREA") return;
+			e.preventDefault();
+			const { currentMix, isPlaying, pause, resume } =
+				usePlayerStore.getState();
+			if (!currentMix) return;
+			if (isPlaying) pause();
+			else resume();
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
@@ -45,7 +34,8 @@ function useMediaKeys() {
 
 export default function App() {
 	useDocumentTitle();
-	useMediaKeys();
+	useSpacebarPlayPause();
+
 	return (
 		<div className="min-h-screen bg-bg-primary">
 			<Navbar />
