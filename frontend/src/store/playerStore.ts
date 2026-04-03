@@ -14,8 +14,15 @@ interface PlayerState {
 	resume: () => void;
 	next: () => void;
 	prev: () => void;
+	skipChapter: (dir: "next" | "prev") => void;
+	volume: number;
+	muted: boolean;
+	pendingSeek: number | null;
+	seekTo: (time: number) => void;
 	setProgress: (currentTime: number, duration: number) => void;
 	setIsPlaying: (v: boolean) => void;
+	setVolume: (v: number) => void;
+	toggleMute: () => void;
 }
 
 export const usePlayerStore = create<PlayerState>()((set, get) => ({
@@ -35,6 +42,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 			queueIndex: idx >= 0 ? idx : 0,
 			isPlaying: true,
 			currentTime: 0,
+			duration: mix.duration_seconds,
 		});
 	},
 
@@ -58,7 +66,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 		const { queue, queueIndex, currentTime } = get();
 		// If more than 3s in, restart current; otherwise go to previous
 		if (currentTime > 3) {
-			set({ currentTime: 0 });
+			set({ currentTime: 0, pendingSeek: 0 });
 			return;
 		}
 		const prevIdx = queueIndex - 1;
@@ -72,6 +80,54 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 		}
 	},
 
+	skipChapter: (dir) => {
+		const { currentMix, currentTime, duration } = get();
+		if (!currentMix) return;
+		const chapters = currentMix.chapters;
+
+		if (dir === "next") {
+			if (chapters && chapters.length > 0) {
+				const next = chapters.find((c) => c.time > currentTime + 1);
+				if (next) {
+					set({ currentTime: next.time, pendingSeek: next.time });
+				} else {
+					get().next();
+				}
+			} else {
+				const t = Math.min(currentTime + 180, duration);
+				set({ currentTime: t, pendingSeek: t });
+			}
+		} else {
+			if (chapters && chapters.length > 0) {
+				const currentChapterIdx = chapters.reduce(
+					(best, c, i) => (c.time <= currentTime ? i : best),
+					-1,
+				);
+				if (
+					currentChapterIdx >= 0 &&
+					currentTime - chapters[currentChapterIdx].time > 3
+				) {
+					const t = chapters[currentChapterIdx].time;
+					set({ currentTime: t, pendingSeek: t });
+				} else if (currentChapterIdx > 0) {
+					const t = chapters[currentChapterIdx - 1].time;
+					set({ currentTime: t, pendingSeek: t });
+				} else {
+					set({ currentTime: 0, pendingSeek: 0 });
+				}
+			} else {
+				const t = Math.max(currentTime - 180, 0);
+				set({ currentTime: t, pendingSeek: t });
+			}
+		}
+	},
+
+	volume: 80,
+	muted: false,
+	pendingSeek: null,
+	seekTo: (time) => set({ currentTime: time, pendingSeek: time }),
 	setProgress: (currentTime, duration) => set({ currentTime, duration }),
 	setIsPlaying: (v) => set({ isPlaying: v }),
+	setVolume: (v) => set({ volume: v, muted: v === 0 }),
+	toggleMute: () => set((s) => ({ muted: !s.muted })),
 }));
