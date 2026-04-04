@@ -4,6 +4,12 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
 	plugins: [react(), tailwindcss()],
+	preview: {
+		headers: {
+			// Hashed assets are immutable
+			"Cache-Control": "public, max-age=31536000, immutable",
+		},
+	},
 	build: {
 		rollupOptions: {
 			output: {
