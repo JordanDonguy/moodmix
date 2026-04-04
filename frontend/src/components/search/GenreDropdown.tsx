@@ -115,7 +115,11 @@ export default function GenreDropdown({
 				{button}
 				{open && (
 					<div className="pt-3">
-						<GenreChips selected={selected} onToggle={onToggle} onClear={onClear} />
+						<GenreChips
+							selected={selected}
+							onToggle={onToggle}
+							onClear={onClear}
+						/>
 					</div>
 				)}
 			</div>
@@ -127,7 +131,11 @@ export default function GenreDropdown({
 			{button}
 			{open && (
 				<div className="absolute top-full mt-2 left-0 z-50 bg-bg-secondary border border-border rounded-xl p-3 shadow-lg min-w-70">
-					<GenreChips selected={selected} onToggle={onToggle} onClear={onClear} />
+					<GenreChips
+						selected={selected}
+						onToggle={onToggle}
+						onClear={onClear}
+					/>
 				</div>
 			)}
 		</div>

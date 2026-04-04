@@ -96,9 +96,7 @@ export default function MobileNavbar() {
 							setFiltersOpen(false);
 						}}
 						className={`p-2 rounded-lg transition-colors cursor-pointer ${
-							searchOpen
-								? "text-accent"
-								: "text-text-primary hover:opacity-80"
+							searchOpen ? "text-accent" : "text-text-primary hover:opacity-80"
 						}`}
 					>
 						{searchOpen ? <X size={20} /> : <Search size={20} />}
@@ -111,9 +109,7 @@ export default function MobileNavbar() {
 							setSearchOpen(false);
 						}}
 						className={`relative p-2 rounded-lg transition-colors cursor-pointer ${
-							filtersOpen
-								? "text-accent"
-								: "text-text-primary hover:opacity-80"
+							filtersOpen ? "text-accent" : "text-text-primary hover:opacity-80"
 						}`}
 					>
 						<SlidersHorizontal size={20} />

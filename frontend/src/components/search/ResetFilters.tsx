@@ -1,7 +1,13 @@
 import { RotateCcw } from "lucide-react";
 import { useSearchStore } from "../../store/searchStore";
 
-export default function ResetFilters({ size = 16, divider = false }: { size?: number; divider?: boolean }) {
+export default function ResetFilters({
+	size = 16,
+	divider = false,
+}: {
+	size?: number;
+	divider?: boolean;
+}) {
 	const { mood, energy, instrumentation, genres, instrumental, resetAll } =
 		useSearchStore();
 
