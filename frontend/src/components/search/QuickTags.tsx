@@ -58,6 +58,7 @@ export default function QuickTags() {
 				<button
 					type="button"
 					onClick={() => scroll("left")}
+					aria-label="Scroll tags left"
 					className="absolute left-0 top-0 bottom-0 z-10 flex items-center pl-3 pr-3 bg-linear-to-r from-bg-primary from-60% to-transparent cursor-pointer"
 				>
 					<ChevronLeft size={18} className="text-text-primary" />
@@ -87,6 +88,7 @@ export default function QuickTags() {
 				<button
 					type="button"
 					onClick={() => scroll("right")}
+					aria-label="Scroll tags right"
 					className="absolute right-0 top-0 bottom-0 z-10 flex items-center pr-5 pl-3 bg-linear-to-l from-bg-primary from-60% to-transparent cursor-pointer"
 				>
 					<ChevronRight size={18} className="text-text-primary" />

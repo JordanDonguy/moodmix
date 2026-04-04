@@ -39,6 +39,7 @@ function ProgressBar({
 				ref={progressRef}
 				type="button"
 				onClick={onSeek}
+				aria-label="Seek in track"
 				className="flex-1 h-3 flex items-center cursor-pointer group"
 			>
 				<div className="h-1 w-full rounded-full bg-bg-elevated relative">
@@ -112,7 +113,7 @@ export default function PlayerBar() {
 
 	const controls = (
 		<div className="flex items-center gap-3">
-			<button type="button" onClick={prev} disabled={!currentMix} className={btnSm}>
+			<button type="button" onClick={prev} disabled={!currentMix} className={btnSm} aria-label="Previous mix">
 				<SkipBack size={18} />
 			</button>
 			<button
@@ -120,6 +121,7 @@ export default function PlayerBar() {
 				onClick={() => skipChapter("prev")}
 				disabled={!currentMix}
 				className={btnSm}
+				aria-label="Previous chapter"
 			>
 				<Rewind size={18} />
 			</button>
@@ -128,6 +130,7 @@ export default function PlayerBar() {
 				onClick={isPlaying ? pause : resume}
 				disabled={!currentMix}
 				className="w-8 h-8 flex items-center justify-center rounded-full bg-text-primary text-bg-primary hover:scale-105 transition-transform cursor-pointer disabled:opacity-30"
+				aria-label={isPlaying ? "Pause" : "Play"}
 			>
 				{isPlaying ? (
 					<Pause size={16} />
@@ -140,17 +143,18 @@ export default function PlayerBar() {
 				onClick={() => skipChapter("next")}
 				disabled={!currentMix}
 				className={btnSm}
+				aria-label="Next chapter"
 			>
 				<FastForward size={18} />
 			</button>
-			<button type="button" onClick={next} disabled={!currentMix} className={btnSm}>
+			<button type="button" onClick={next} disabled={!currentMix} className={btnSm} aria-label="Next mix">
 				<SkipForward size={18} />
 			</button>
 		</div>
 	);
 
 	return (
-		<div className="fixed bottom-0 left-0 right-0 z-50 bg-bg-primary/91 backdrop-blur-[3px] border-t border-border">
+		<div className="fixed bottom-0 left-0 right-0 z-50 bg-bg-primary/91 backdrop-blur-[3px] border-t border-border animate-slide-up">
 			{/* ── Desktop ── */}
 			<div className="hidden sm:flex items-center gap-4 px-4 h-18">
 				{/* Left: Thumbnail + info */}
@@ -197,6 +201,7 @@ export default function PlayerBar() {
 					<button
 						type="button"
 						onClick={toggleMute}
+						aria-label={muted ? "Unmute" : "Mute"}
 						className="text-text-muted hover:text-text-primary transition-colors cursor-pointer"
 					>
 						{muted || volume === 0 ? (
@@ -209,6 +214,7 @@ export default function PlayerBar() {
 						ref={volumeRef}
 						type="button"
 						onClick={handleVolume}
+						aria-label="Volume"
 						className="h-3 w-24 flex items-center cursor-pointer group"
 					>
 						<div className="h-1 w-full rounded-full bg-bg-elevated relative">
