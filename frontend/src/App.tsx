@@ -1,11 +1,13 @@
-import { useEffect } from "react";
-import MobileNavbar from "./components/layout/MobileNavbar";
+import { lazy, Suspense, useEffect } from "react";
+
 import Navbar from "./components/layout/Navbar";
-import PlayerBar from "./components/layout/PlayerBar";
 import MixGrid from "./components/mixes/MixGrid";
-import YouTubePlayer from "./components/player/YouTubePlayer";
 import QuickTags from "./components/search/QuickTags";
 import { usePlayerStore } from "./store/playerStore";
+
+const MobileNavbar = lazy(() => import("./components/layout/MobileNavbar"));
+const PlayerBar = lazy(() => import("./components/layout/PlayerBar"));
+const YouTubePlayer = lazy(() => import("./components/player/YouTubePlayer"));
 
 function useDocumentTitle() {
 	const currentMix = usePlayerStore((s) => s.currentMix);
@@ -39,15 +41,19 @@ export default function App() {
 	return (
 		<div className="min-h-screen bg-bg-primary">
 			<Navbar />
-			<MobileNavbar />
+			<Suspense>
+				<MobileNavbar />
+			</Suspense>
 			<QuickTags />
 
 			<main className="px-4 py-6 pb-24">
 				<MixGrid />
 			</main>
 
-			<PlayerBar />
-			<YouTubePlayer />
+			<Suspense>
+				<PlayerBar />
+				<YouTubePlayer />
+			</Suspense>
 		</div>
 	);
 }
