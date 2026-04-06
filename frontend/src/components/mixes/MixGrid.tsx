@@ -65,9 +65,15 @@ export default function MixGrid() {
 				<p className="text-text-muted text-sm text-center py-8">Loading...</p>
 			)}
 			{error && (
-				<p className="text-accent text-sm text-center py-8">
-					Error: {String(error)}
-				</p>
+				<div className="text-center py-20 text-text-muted text-lg">
+					<img
+						src="/oops_emoji.png"
+						alt="Oops emoji"
+						className="mx-auto mb-4 w-16 h-16"
+					/>
+					<p>Couldn't reach the server...</p>
+					<p>Check your connection and try again.</p>
+				</div>
 			)}
 
 			{!isLoading && allMixes.length === 0 && data && (
@@ -85,8 +91,8 @@ export default function MixGrid() {
 			{allMixes.length > 0 && (
 				<>
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-						{allMixes.map((m) => (
-							<MixCard key={m.id} mix={m} queue={allMixes} />
+						{allMixes.map((m, i) => (
+							<MixCard key={m.id} mix={m} queue={allMixes} priority={i < 4} />
 						))}
 					</div>
 

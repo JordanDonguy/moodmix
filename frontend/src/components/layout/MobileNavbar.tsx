@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from "framer-motion";
 import {
 	Cpu,
 	Drum,
@@ -84,6 +83,7 @@ export default function MobileNavbar() {
 					<button
 						type="button"
 						onClick={toggleTheme}
+						aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
 						className="p-2 text-text-primary hover:opacity-80 transition-colors cursor-pointer"
 					>
 						{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
@@ -95,6 +95,7 @@ export default function MobileNavbar() {
 							setSearchOpen((o) => !o);
 							setFiltersOpen(false);
 						}}
+						aria-label={searchOpen ? "Close search" : "Open search"}
 						className={`p-2 rounded-lg transition-colors cursor-pointer ${
 							searchOpen ? "text-accent" : "text-text-primary hover:opacity-80"
 						}`}
@@ -108,6 +109,7 @@ export default function MobileNavbar() {
 							setFiltersOpen((o) => !o);
 							setSearchOpen(false);
 						}}
+						aria-label={filtersOpen ? "Close filters" : "Open filters"}
 						className={`relative p-2 rounded-lg transition-colors cursor-pointer ${
 							filtersOpen ? "text-accent" : "text-text-primary hover:opacity-80"
 						}`}
@@ -123,107 +125,105 @@ export default function MobileNavbar() {
 			</div>
 
 			{/* Search panel */}
-			<AnimatePresence>
-				{searchOpen && (
-					<motion.div
-						initial={{ height: 0, opacity: 0 }}
-						animate={{ height: "auto", opacity: 1 }}
-						exit={{ height: 0, opacity: 0 }}
-						transition={{ duration: 0.2 }}
-						className="overflow-hidden bg-bg-primary/91 backdrop-blur-[3px] border-b border-border"
-					>
-						<div className="px-4 py-3">
-							<AiSearchBar />
-						</div>
-					</motion.div>
-				)}
-			</AnimatePresence>
+			<div
+				className="grid transition-[grid-template-rows,opacity] duration-200 ease-out bg-bg-primary/91 backdrop-blur-[3px] border-b border-border"
+				style={{
+					gridTemplateRows: searchOpen ? "1fr" : "0fr",
+					opacity: searchOpen ? 1 : 0,
+					borderBottomWidth: searchOpen ? undefined : 0,
+				}}
+			>
+				<div className="overflow-hidden">
+					<div className="px-4 py-3">
+						<AiSearchBar />
+					</div>
+				</div>
+			</div>
 
 			{/* Filters sheet */}
-			<AnimatePresence>
-				{filtersOpen && (
-					<motion.div
-						initial={{ height: 0, opacity: 0 }}
-						animate={{ height: "auto", opacity: 1 }}
-						exit={{ height: 0, opacity: 0 }}
-						transition={{ duration: 0.2 }}
-						className="overflow-hidden bg-bg-primary/91 backdrop-blur-[3px] border-b border-border"
-					>
-						<div className="px-4 py-4 space-y-4">
-							{/* Sliders with labels */}
-							<div className="space-y-3">
-								<span className="text-xs text-text-muted uppercase tracking-wider">
-									Mood
-								</span>
-								<MoodSlider
-									value={mood}
-									onChange={setMood}
-									leftIcon={MoonStar}
-									rightIcon={Sun}
-									leftTooltip="Dark"
-									rightTooltip="Bright"
-									gradientFrom="#6366f1"
-									gradientTo="#f97316"
-									expand
-								/>
-							</div>
+			<div
+				className="grid transition-[grid-template-rows,opacity] duration-200 ease-out bg-bg-primary/91 backdrop-blur-[3px] border-b border-border"
+				style={{
+					gridTemplateRows: filtersOpen ? "1fr" : "0fr",
+					opacity: filtersOpen ? 1 : 0,
+					borderBottomWidth: filtersOpen ? undefined : 0,
+				}}
+			>
+				<div className="overflow-hidden">
+					<div className="px-4 py-4 space-y-4">
+						{/* Sliders with labels */}
+						<div className="space-y-3">
+							<span className="text-xs text-text-muted uppercase tracking-wider">
+								Mood
+							</span>
+							<MoodSlider
+								value={mood}
+								onChange={setMood}
+								leftIcon={MoonStar}
+								rightIcon={Sun}
+								leftTooltip="Dark"
+								rightTooltip="Bright"
+								gradientFrom="#6366f1"
+								gradientTo="#f97316"
+								expand
+							/>
+						</div>
 
-							<div className="space-y-3">
-								<span className="text-xs text-text-muted uppercase tracking-wider">
-									Energy
-								</span>
-								<MoodSlider
-									value={energy}
-									onChange={setEnergy}
-									leftIcon={Sofa}
-									rightIcon={Zap}
-									leftTooltip="Chill"
-									rightTooltip="Dynamic"
-									gradientFrom="#14b8a6"
-									gradientTo="#eab308"
-									expand
-								/>
-							</div>
+						<div className="space-y-3">
+							<span className="text-xs text-text-muted uppercase tracking-wider">
+								Energy
+							</span>
+							<MoodSlider
+								value={energy}
+								onChange={setEnergy}
+								leftIcon={Sofa}
+								rightIcon={Zap}
+								leftTooltip="Chill"
+								rightTooltip="Dynamic"
+								gradientFrom="#14b8a6"
+								gradientTo="#eab308"
+								expand
+							/>
+						</div>
 
-							<div className="space-y-3">
-								<span className="text-xs text-text-muted uppercase tracking-wider">
-									Instrumentation
-								</span>
-								<MoodSlider
-									value={instrumentation}
-									onChange={setInstrumentation}
-									leftIcon={Drum}
-									rightIcon={Cpu}
-									leftTooltip="Organic"
-									rightTooltip="Electronic"
-									gradientFrom="#d97706"
-									gradientTo="#8b5cf6"
-									expand
-								/>
-							</div>
+						<div className="space-y-3">
+							<span className="text-xs text-text-muted uppercase tracking-wider">
+								Instrumentation
+							</span>
+							<MoodSlider
+								value={instrumentation}
+								onChange={setInstrumentation}
+								leftIcon={Drum}
+								rightIcon={Cpu}
+								leftTooltip="Organic"
+								rightTooltip="Electronic"
+								gradientFrom="#d97706"
+								gradientTo="#8b5cf6"
+								expand
+							/>
+						</div>
 
-							{/* Vocal toggle + reset + genres */}
-							<div className="pt-2">
-								<div className="flex justify-between items-start">
-									<GenreDropdown
-										selected={genres}
-										onToggle={toggleGenre}
-										onClear={clearGenres}
-										inline
+						{/* Vocal toggle + reset + genres */}
+						<div className="pt-2">
+							<div className="flex justify-between items-start">
+								<GenreDropdown
+									selected={genres}
+									onToggle={toggleGenre}
+									onClear={clearGenres}
+									inline
+								/>
+								<div className="flex items-center gap-2 shrink-0">
+									<ResetFilters size={18} />
+									<VocalToggle
+										instrumental={instrumental}
+										onChange={setInstrumental}
 									/>
-									<div className="flex items-center gap-2 shrink-0">
-										<ResetFilters size={18} />
-										<VocalToggle
-											instrumental={instrumental}
-											onChange={setInstrumental}
-										/>
-									</div>
 								</div>
 							</div>
 						</div>
-					</motion.div>
-				)}
-			</AnimatePresence>
+					</div>
+				</div>
+			</div>
 		</div>
 	);
 }

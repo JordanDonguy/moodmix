@@ -12,7 +12,7 @@ export default function VocalToggle({
 	return (
 		<button
 			type="button"
-			title={instrumental ? "Instrumental only" : "All mixes"}
+			aria-label={instrumental ? "Showing instrumental only" : "Showing all mixes"}
 			onClick={() => onChange(!instrumental)}
 			className={`p-2 mr-3.5 lg:mr-0 rounded-lg transition-colors cursor-pointer ${
 				instrumental

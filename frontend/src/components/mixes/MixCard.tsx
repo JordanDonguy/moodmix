@@ -44,7 +44,7 @@ function moodToColor(mix: Mix): string {
 	return `${hue} ${saturation}% ${lightness}%`;
 }
 
-export function MixCard({ mix, queue }: { mix: Mix; queue: Mix[] }) {
+export function MixCard({ mix, queue, priority }: { mix: Mix; queue: Mix[]; priority?: boolean }) {
 	const currentMixId = usePlayerStore((s) => s.currentMix?.id);
 	const isActive = currentMixId === mix.id;
 
@@ -78,6 +78,9 @@ export function MixCard({ mix, queue }: { mix: Mix; queue: Mix[] }) {
 				<img
 					src={thumbnail}
 					alt={mix.title}
+					loading={priority ? "eager" : "lazy"}
+					decoding="async"
+					fetchPriority={priority ? "high" : "auto"}
 					className="w-full h-full object-cover group-hover:scale-105 duration-200"
 				/>
 				<span className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">

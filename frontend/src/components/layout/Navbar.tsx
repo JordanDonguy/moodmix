@@ -100,7 +100,7 @@ export default function Navbar() {
 			<button
 				type="button"
 				onClick={toggleTheme}
-				title={theme === "dark" ? "Switch to light" : "Switch to dark"}
+				aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
 				className="p-2 text-text-primary hover:opacity-80 transition-colors cursor-pointer"
 			>
 				{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}

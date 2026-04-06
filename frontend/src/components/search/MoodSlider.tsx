@@ -64,7 +64,7 @@ export default function MoodSlider({
 		<div className="flex items-center gap-2 select-none min-w-0">
 			<button
 				type="button"
-				title={leftTooltip}
+				aria-label={leftTooltip}
 				onClick={() => onChange(-1)}
 				className="text-text-primary hover:opacity-80 transition cursor-pointer shrink-0"
 			>
@@ -75,6 +75,7 @@ export default function MoodSlider({
 				ref={trackRef}
 				role="slider"
 				tabIndex={0}
+				aria-label={`${leftTooltip} to ${rightTooltip}`}
 				aria-valuemin={-1}
 				aria-valuemax={1}
 				aria-valuenow={displayValue}
@@ -111,7 +112,7 @@ export default function MoodSlider({
 
 			<button
 				type="button"
-				title={rightTooltip}
+				aria-label={rightTooltip}
 				onClick={() => onChange(1)}
 				className="text-text-primary hover:opacity-80 transition cursor-pointer"
 			>
@@ -121,7 +122,7 @@ export default function MoodSlider({
 			{expand ? (
 				<button
 					type="button"
-					title="Reset"
+					aria-label="Reset"
 					onClick={() => onChange(null)}
 					className={`transition-opacity cursor-pointer text-text-primary ${active ? "opacity-60 hover:opacity-100" : "opacity-0 pointer-events-none"}`}
 				>
@@ -131,7 +132,7 @@ export default function MoodSlider({
 				active && (
 					<button
 						type="button"
-						title="Reset"
+						aria-label="Reset"
 						onClick={() => onChange(null)}
 						className="opacity-60 hover:opacity-100 text-text-primary transition-opacity cursor-pointer"
 					>

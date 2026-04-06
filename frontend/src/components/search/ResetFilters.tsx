@@ -26,7 +26,7 @@ export default function ResetFilters({
 			<button
 				type="button"
 				onClick={resetAll}
-				title="Reset all filters"
+				aria-label="Reset all filters"
 				className="text-text-primary hover:opacity-80 transition cursor-pointer shrink-0"
 			>
 				<RotateCcw size={size} />
