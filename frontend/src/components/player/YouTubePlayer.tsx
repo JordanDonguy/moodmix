@@ -25,15 +25,15 @@ export default function YouTubePlayer() {
 	const loadingRef = useRef(false);
 	const seekingRef = useRef(false);
 	const intervalRef = useRef<number>(0);
-	// Manual time tracking: record wall-clock time when playback starts/resumes
 	const playStartedAtRef = useRef(0);
 	const playStartedTimeRef = useRef(0);
+
 	const currentMix = usePlayerStore((s) => s.currentMix);
 	const isPlaying = usePlayerStore((s) => s.isPlaying);
+	const playerContainer = usePlayerStore((s) => s.playerContainer);
 
 	const startTracking = useCallback(() => {
 		clearInterval(intervalRef.current);
-		// Record when we started tracking for manual time calculation
 		playStartedAtRef.current = Date.now();
 		playStartedTimeRef.current = usePlayerStore.getState().currentTime;
 		intervalRef.current = window.setInterval(() => {
@@ -49,16 +49,50 @@ export default function YouTubePlayer() {
 		clearInterval(intervalRef.current);
 	}, []);
 
-	// Load API on mount
+	// Load API script on mount
 	useEffect(() => {
 		loadApi();
+	}, []);
+
+	// Create/recreate player when container changes
+	useEffect(() => {
+		if (!playerContainer) {
+			if (playerRef.current) {
+				stopTracking();
+				playerRef.current.destroy();
+				playerRef.current = null;
+				readyRef.current = false;
+			}
+			return;
+		}
+
+		let cancelled = false;
+
 		apiReady.then(() => {
-			new window.YT.Player("yt-player", {
-				height: "1",
-				width: "1",
+			if (cancelled) return;
+
+			const state = usePlayerStore.getState();
+
+			// Destroy existing player
+			if (playerRef.current) {
+				stopTracking();
+				playerRef.current.destroy();
+				playerRef.current = null;
+				readyRef.current = false;
+			}
+
+			// Create inner div for YT to replace with iframe
+			const innerDiv = document.createElement("div");
+			innerDiv.style.width = "100%";
+			innerDiv.style.height = "100%";
+			playerContainer.appendChild(innerDiv);
+
+			new window.YT.Player(innerDiv, {
+				width: "100%",
+				height: "100%",
 				playerVars: {
-					autoplay: 0,
-					controls: 0,
+					autoplay: 1,
+					controls: 1,
 					disablekb: 1,
 					modestbranding: 1,
 					rel: 0,
@@ -66,14 +100,21 @@ export default function YouTubePlayer() {
 				},
 				events: {
 					onReady: (event) => {
+						if (cancelled) return;
 						playerRef.current = event.target;
 						readyRef.current = true;
+
+						event.target.setVolume(state.volume);
+						if (state.muted) event.target.mute();
+
 						const mix = usePlayerStore.getState().currentMix;
 						if (mix) {
-							event.target.loadVideoById(mix.youtube_id);
+							loadingRef.current = true;
+							event.target.loadVideoById(mix.youtube_id, state.currentTime);
 						}
 					},
 					onStateChange: (event) => {
+						if (cancelled) return;
 						const { setIsPlaying, next } = usePlayerStore.getState();
 						switch (event.data) {
 							case window.YT.PlayerState.PLAYING:
@@ -93,10 +134,9 @@ export default function YouTubePlayer() {
 						}
 					},
 					onError: () => {
+						if (cancelled) return;
 						const { currentMix: mix, next } = usePlayerStore.getState();
-						if (mix) {
-							reportUnavailable(mix.id).catch(() => {});
-						}
+						if (mix) reportUnavailable(mix.id).catch(() => {});
 						next();
 					},
 				},
@@ -104,12 +144,20 @@ export default function YouTubePlayer() {
 		});
 
 		return () => {
+			cancelled = true;
 			stopTracking();
-			playerRef.current?.destroy();
+			if (playerRef.current) {
+				playerRef.current.destroy();
+				playerRef.current = null;
+				readyRef.current = false;
+			}
+			while (playerContainer.firstChild) {
+				playerContainer.removeChild(playerContainer.firstChild);
+			}
 		};
-	}, [startTracking, stopTracking]);
+	}, [playerContainer, startTracking, stopTracking]);
 
-	// Load new video when currentMix changes
+	// Load new video when currentMix changes (same container, different mix — e.g. auto-advance)
 	useEffect(() => {
 		if (!readyRef.current || !playerRef.current || !currentMix) return;
 		loadingRef.current = true;
@@ -119,7 +167,6 @@ export default function YouTubePlayer() {
 	// Play/pause sync
 	useEffect(() => {
 		if (!readyRef.current || !playerRef.current || !currentMix) return;
-
 		if (isPlaying) {
 			playerRef.current.playVideo();
 			startTracking();
@@ -152,6 +199,7 @@ export default function YouTubePlayer() {
 		};
 	}, []);
 
+	// Media metadata
 	useEffect(() => {
 		if (!("mediaSession" in navigator)) return;
 		if (!currentMix) {
@@ -183,9 +231,7 @@ export default function YouTubePlayer() {
 		const unsub = usePlayerStore.subscribe((state, prev) => {
 			const player = playerRef.current;
 			if (!player) return;
-			if (state.volume !== prev.volume) {
-				player.setVolume(state.volume);
-			}
+			if (state.volume !== prev.volume) player.setVolume(state.volume);
 			if (state.muted !== prev.muted) {
 				if (state.muted) player.mute();
 				else player.unMute();
@@ -194,7 +240,7 @@ export default function YouTubePlayer() {
 		return unsub;
 	}, []);
 
-	// Seek when user explicitly calls seekTo
+	// Seek
 	useEffect(() => {
 		const unsub = usePlayerStore.subscribe((state, prev) => {
 			if (
@@ -204,12 +250,10 @@ export default function YouTubePlayer() {
 				seekingRef.current = true;
 				playerRef.current?.seekTo(state.pendingSeek, true);
 				usePlayerStore.setState({ pendingSeek: null });
-				// Update manual tracking refs to the seek position
 				playStartedAtRef.current = Date.now();
 				playStartedTimeRef.current = state.currentTime;
 				setTimeout(() => {
 					seekingRef.current = false;
-					// Re-sync manual tracking after seek settles
 					startTracking();
 				}, 1000);
 			}
@@ -217,10 +261,6 @@ export default function YouTubePlayer() {
 		return unsub;
 	}, [startTracking]);
 
-	return (
-		<div
-			id="yt-player"
-			className="fixed -left-2499.75 -top-2499.75 w-px h-px"
-		/>
-	);
+	// No visible DOM — player lives inside the active MixCard
+	return null;
 }

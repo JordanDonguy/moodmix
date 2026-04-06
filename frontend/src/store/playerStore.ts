@@ -23,6 +23,8 @@ interface PlayerState {
 	setIsPlaying: (v: boolean) => void;
 	setVolume: (v: number) => void;
 	toggleMute: () => void;
+	playerContainer: HTMLDivElement | null;
+	setPlayerContainer: (el: HTMLDivElement | null) => void;
 }
 
 export const usePlayerStore = create<PlayerState>()((set, get) => ({
@@ -129,4 +131,6 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 	setIsPlaying: (v) => set({ isPlaying: v }),
 	setVolume: (v) => set({ volume: v, muted: v === 0 }),
 	toggleMute: () => set((s) => ({ muted: !s.muted })),
+	playerContainer: null,
+	setPlayerContainer: (el) => set({ playerContainer: el }),
 }));

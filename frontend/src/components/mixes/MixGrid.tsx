@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { searchMixes } from "../../api/mixes";
 import { useDebounce } from "../../hooks/useDebounce";
+import { usePlayerStore } from "../../store/playerStore";
 import { useSearchStore } from "../../store/searchStore";
 import { MixCard } from "./MixCard";
 
@@ -36,7 +37,11 @@ export default function MixGrid() {
 			initialPageParam: 0,
 		});
 
-	const allMixes = data?.pages.flatMap((p) => p.mixes) ?? [];
+	const currentMix = usePlayerStore((s) => s.currentMix);
+	const fetchedMixes = data?.pages.flatMap((p) => p.mixes) ?? [];
+	const allMixes = currentMix && !fetchedMixes.some((m) => m.id === currentMix.id)
+		? [currentMix, ...fetchedMixes]
+		: fetchedMixes;
 
 	// Infinite scroll sentinel
 	const sentinelRef = useRef<HTMLDivElement>(null);
