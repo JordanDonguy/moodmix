@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { usePlayerStore } from "../../store/playerStore";
 import type { Mix } from "../../types/mix";
 import { formatDuration } from "../../utils/formatDuration";
@@ -46,7 +46,15 @@ function moodToColor(mix: Mix): string {
 
 export function MixCard({ mix, queue, priority }: { mix: Mix; queue: Mix[]; priority?: boolean }) {
 	const currentMixId = usePlayerStore((s) => s.currentMix?.id);
+	const setPlayerContainer = usePlayerStore((s) => s.setPlayerContainer);
 	const isActive = currentMixId === mix.id;
+	const containerRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (!isActive || !containerRef.current) return;
+		setPlayerContainer(containerRef.current);
+		return () => setPlayerContainer(null);
+	}, [isActive, setPlayerContainer]);
 
 	const hsl = useMemo(() => moodToColor(mix), [mix]);
 
@@ -83,7 +91,8 @@ export function MixCard({ mix, queue, priority }: { mix: Mix; queue: Mix[]; prio
 					fetchPriority={priority ? "high" : "auto"}
 					className="w-full h-full object-cover group-hover:scale-105 duration-200"
 				/>
-				<span className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
+				{isActive && <div ref={containerRef} className="absolute inset-0 z-10" />}
+				<span className="absolute bottom-1.5 right-1.5 z-20 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
 					{formatDuration(mix.duration_seconds)}
 				</span>
 			</div>

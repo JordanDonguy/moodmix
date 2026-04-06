@@ -5,7 +5,7 @@ interface YTPlayerEvent {
 }
 
 interface YTPlayer {
-	loadVideoById(videoId: string): void;
+	loadVideoById(videoId: string, startSeconds?: number): void;
 	playVideo(): void;
 	pauseVideo(): void;
 	seekTo(seconds: number, allowSeekAhead: boolean): void;
@@ -39,7 +39,7 @@ interface YTPlayerOptions {
 }
 
 interface YTStatic {
-	Player: new (elementId: string, options: YTPlayerOptions) => YTPlayer;
+	Player: new (elementOrId: string | HTMLElement, options: YTPlayerOptions) => YTPlayer;
 	PlayerState: {
 		UNSTARTED: -1;
 		ENDED: 0;
