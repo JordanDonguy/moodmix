@@ -12,8 +12,10 @@ import { useRef } from "react";
 import { usePlayerStore } from "../../store/playerStore";
 
 function formatTime(seconds: number): string {
-	const m = Math.floor(seconds / 60);
+	const h = Math.floor(seconds / 3600);
+	const m = Math.floor((seconds % 3600) / 60);
 	const s = Math.floor(seconds % 60);
+	if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 	return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
@@ -24,8 +26,8 @@ function ProgressBar({
 	currentTime,
 	duration,
 }: {
-	progressRef: React.RefObject<HTMLButtonElement | null>;
-	onSeek: (e: React.MouseEvent) => void;
+	progressRef: React.RefObject<HTMLDivElement | null>;
+	onSeek: (e: React.PointerEvent) => void;
 	progress: number;
 	currentTime: number;
 	duration: number;
@@ -35,12 +37,20 @@ function ProgressBar({
 			<span className="text-[11px] text-text-muted tabular-nums w-8 text-right shrink-0">
 				{duration > 0 ? formatTime(currentTime) : "-:--"}
 			</span>
-			<button
+			<div
 				ref={progressRef}
-				type="button"
-				onClick={onSeek}
+				role="slider"
+				tabIndex={0}
 				aria-label="Seek in track"
-				className="flex-1 h-3 flex items-center cursor-pointer group"
+				aria-valuemin={0}
+				aria-valuemax={duration}
+				aria-valuenow={Math.floor(currentTime)}
+				onPointerDown={(e) => {
+					(e.target as HTMLElement).setPointerCapture(e.pointerId);
+					onSeek(e);
+				}}
+				onPointerMove={(e) => e.buttons > 0 && onSeek(e)}
+				className="flex-1 h-3 flex items-center cursor-pointer group touch-none"
 			>
 				<div className="h-1 w-full rounded-full bg-bg-elevated relative">
 					<div
@@ -48,7 +58,7 @@ function ProgressBar({
 						style={{ width: `${progress}%` }}
 					/>
 				</div>
-			</button>
+			</div>
 			<span className="text-[11px] text-text-muted tabular-nums w-8 shrink-0">
 				{duration > 0 ? formatTime(duration) : "-:--"}
 			</span>
@@ -72,13 +82,13 @@ export default function PlayerBar() {
 		setVolume,
 		toggleMute,
 	} = usePlayerStore();
-	const progressRef = useRef<HTMLButtonElement>(null);
-	const mobileProgressRef = useRef<HTMLButtonElement>(null);
-	const volumeRef = useRef<HTMLButtonElement>(null);
+	const progressRef = useRef<HTMLDivElement>(null);
+	const mobileProgressRef = useRef<HTMLDivElement>(null);
+	const volumeRef = useRef<HTMLDivElement>(null);
 
 	const handleSeek =
-		(ref: React.RefObject<HTMLButtonElement | null>) =>
-		(e: React.MouseEvent) => {
+		(ref: React.RefObject<HTMLDivElement | null>) =>
+		(e: React.PointerEvent) => {
 			const bar = ref.current;
 			if (!bar || !duration) return;
 			const rect = bar.getBoundingClientRect();
@@ -89,15 +99,17 @@ export default function PlayerBar() {
 			usePlayerStore.getState().seekTo(ratio * duration);
 		};
 
-	const handleVolume = (e: React.MouseEvent) => {
+	const volumeFromEvent = (e: React.PointerEvent) => {
 		const bar = volumeRef.current;
 		if (!bar) return;
 		const rect = bar.getBoundingClientRect();
-		const ratio = Math.max(
-			0,
-			Math.min(1, (e.clientX - rect.left) / rect.width),
-		);
+		const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
 		setVolume(Math.round(ratio * 100));
+	};
+
+	const onVolumePointerDown = (e: React.PointerEvent) => {
+		(e.target as HTMLElement).setPointerCapture(e.pointerId);
+		volumeFromEvent(e);
 	};
 
 	const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -202,7 +214,7 @@ export default function PlayerBar() {
 						type="button"
 						onClick={toggleMute}
 						aria-label={muted ? "Unmute" : "Mute"}
-						className="text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+						className="text-text-primary/80 hover:text-text-primary transition-colors cursor-pointer"
 					>
 						{muted || volume === 0 ? (
 							<VolumeOff size={18} />
@@ -210,12 +222,17 @@ export default function PlayerBar() {
 							<Volume2 size={18} />
 						)}
 					</button>
-					<button
+					<div
 						ref={volumeRef}
-						type="button"
-						onClick={handleVolume}
+						role="slider"
+						tabIndex={0}
 						aria-label="Volume"
-						className="h-3 w-24 flex items-center cursor-pointer group"
+						aria-valuemin={0}
+						aria-valuemax={100}
+						aria-valuenow={effectiveVolume}
+						onPointerDown={onVolumePointerDown}
+						onPointerMove={(e) => e.buttons > 0 && volumeFromEvent(e)}
+						className="h-3 w-24 flex items-center cursor-pointer group touch-none"
 					>
 						<div className="h-1 w-full rounded-full bg-bg-elevated relative">
 							<div
@@ -223,7 +240,7 @@ export default function PlayerBar() {
 								style={{ width: `${effectiveVolume}%` }}
 							/>
 						</div>
-					</button>
+					</div>
 				</div>
 			</div>
 

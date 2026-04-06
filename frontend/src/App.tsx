@@ -23,6 +23,7 @@ function useSpacebarPlayPause() {
 			const tag = (e.target as HTMLElement).tagName;
 			if (tag === "INPUT" || tag === "TEXTAREA") return;
 			e.preventDefault();
+			(document.activeElement as HTMLElement)?.blur();
 			const { currentMix, isPlaying, pause, resume } =
 				usePlayerStore.getState();
 			if (!currentMix) return;
