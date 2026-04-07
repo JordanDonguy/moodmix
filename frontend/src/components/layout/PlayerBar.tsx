@@ -10,78 +10,20 @@ import {
 } from "lucide-react";
 import { useRef } from "react";
 import { usePlayerStore } from "../../store/playerStore";
-
-function formatTime(seconds: number): string {
-	const h = Math.floor(seconds / 3600);
-	const m = Math.floor((seconds % 3600) / 60);
-	const s = Math.floor(seconds % 60);
-	if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-	return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function ProgressBar({
-	progressRef,
-	onSeek,
-	progress,
-	currentTime,
-	duration,
-}: {
-	progressRef: React.RefObject<HTMLDivElement | null>;
-	onSeek: (e: React.PointerEvent) => void;
-	progress: number;
-	currentTime: number;
-	duration: number;
-}) {
-	return (
-		<div className="flex items-center gap-2 w-full">
-			<span className="text-[11px] text-text-muted tabular-nums w-8 text-right shrink-0">
-				{duration > 0 ? formatTime(currentTime) : "-:--"}
-			</span>
-			<div
-				ref={progressRef}
-				role="slider"
-				tabIndex={0}
-				aria-label="Seek in track"
-				aria-valuemin={0}
-				aria-valuemax={duration}
-				aria-valuenow={Math.floor(currentTime)}
-				onPointerDown={(e) => {
-					(e.target as HTMLElement).setPointerCapture(e.pointerId);
-					onSeek(e);
-				}}
-				onPointerMove={(e) => e.buttons > 0 && onSeek(e)}
-				className="flex-1 h-3 flex items-center cursor-pointer group touch-none"
-			>
-				<div className="h-1 w-full rounded-full bg-bg-elevated relative">
-					<div
-						className="h-full rounded-full bg-text-secondary group-hover:bg-text-primary transition-colors"
-						style={{ width: `${progress}%` }}
-					/>
-				</div>
-			</div>
-			<span className="text-[11px] text-text-muted tabular-nums w-8 shrink-0">
-				{duration > 0 ? formatTime(duration) : "-:--"}
-			</span>
-		</div>
-	);
-}
+import ProgressBar from "../player/ProgressBar";
 
 export default function PlayerBar() {
-	const {
-		currentMix,
-		isPlaying,
-		currentTime,
-		duration,
-		volume,
-		muted,
-		pause,
-		resume,
-		next,
-		prev,
-		skipChapter,
-		setVolume,
-		toggleMute,
-	} = usePlayerStore();
+	const currentMix = usePlayerStore((s) => s.currentMix);
+	const isPlaying = usePlayerStore((s) => s.isPlaying);
+	const volume = usePlayerStore((s) => s.volume);
+	const muted = usePlayerStore((s) => s.muted);
+	const pause = usePlayerStore((s) => s.pause);
+	const resume = usePlayerStore((s) => s.resume);
+	const next = usePlayerStore((s) => s.next);
+	const prev = usePlayerStore((s) => s.prev);
+	const skipChapter = usePlayerStore((s) => s.skipChapter);
+	const setVolume = usePlayerStore((s) => s.setVolume);
+	const toggleMute = usePlayerStore((s) => s.toggleMute);
 	const progressRef = useRef<HTMLDivElement>(null);
 	const mobileProgressRef = useRef<HTMLDivElement>(null);
 	const volumeRef = useRef<HTMLDivElement>(null);
@@ -90,7 +32,9 @@ export default function PlayerBar() {
 		(ref: React.RefObject<HTMLDivElement | null>) =>
 		(e: React.PointerEvent) => {
 			const bar = ref.current;
-			if (!bar || !duration) return;
+			if (!bar) return;
+			const { duration } = usePlayerStore.getState();
+			if (!duration) return;
 			const rect = bar.getBoundingClientRect();
 			const ratio = Math.max(
 				0,
@@ -112,7 +56,6 @@ export default function PlayerBar() {
 		volumeFromEvent(e);
 	};
 
-	const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 	const effectiveVolume = muted ? 0 : volume;
 
 	const thumbnail = currentMix
@@ -202,9 +145,6 @@ export default function PlayerBar() {
 					<ProgressBar
 						progressRef={progressRef}
 						onSeek={handleSeek(progressRef)}
-						progress={progress}
-						currentTime={currentTime}
-						duration={duration}
 					/>
 				</div>
 
@@ -278,9 +218,6 @@ export default function PlayerBar() {
 				<ProgressBar
 					progressRef={mobileProgressRef}
 					onSeek={handleSeek(mobileProgressRef)}
-					progress={progress}
-					currentTime={currentTime}
-					duration={duration}
 				/>
 			</div>
 		</div>
