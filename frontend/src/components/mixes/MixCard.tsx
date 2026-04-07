@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { usePlayerStore } from "../../store/playerStore";
 import type { Mix } from "../../types/mix";
-import { formatDuration } from "../../utils/formatDuration";
+import { formatHoursMinutes } from "../../utils/time";
 
 function moodToColor(mix: Mix): string {
 	const m = mix.mood ?? 0;
@@ -44,7 +44,15 @@ function moodToColor(mix: Mix): string {
 	return `${hue} ${saturation}% ${lightness}%`;
 }
 
-export function MixCard({ mix, queue, priority }: { mix: Mix; queue: Mix[]; priority?: boolean }) {
+export function MixCard({
+	mix,
+	queue,
+	priority,
+}: {
+	mix: Mix;
+	queue: Mix[];
+	priority?: boolean;
+}) {
 	const currentMixId = usePlayerStore((s) => s.currentMix?.id);
 	const setPlayerContainer = usePlayerStore((s) => s.setPlayerContainer);
 	const isActive = currentMixId === mix.id;
@@ -71,16 +79,18 @@ export function MixCard({ mix, queue, priority }: { mix: Mix; queue: Mix[]; prio
 			type="button"
 			onClick={handleClick}
 			className="group cursor-pointer flex flex-col h-full text-left rounded-xl outline-transparent duration-200 card-hover"
-			style={{
-				"--card-color": `hsl(${hsl})`,
-				"--card-hover-bg": `hsl(${hsl} / var(--hover-card-opacity))`,
-				...(isActive
-					? {
-							outline: `8px solid hsl(${hsl} / var(--active-card-opacity))`,
-							backgroundColor: `hsl(${hsl} / var(--active-card-opacity))`,
-						}
-					: {}),
-			} as React.CSSProperties}
+			style={
+				{
+					"--card-color": `hsl(${hsl})`,
+					"--card-hover-bg": `hsl(${hsl} / var(--hover-card-opacity))`,
+					...(isActive
+						? {
+								outline: `8px solid hsl(${hsl} / var(--active-card-opacity))`,
+								backgroundColor: `hsl(${hsl} / var(--active-card-opacity))`,
+							}
+						: {}),
+				} as React.CSSProperties
+			}
 		>
 			<div className="relative aspect-video rounded-xl overflow-hidden bg-bg-secondary w-full">
 				<img
@@ -91,9 +101,11 @@ export function MixCard({ mix, queue, priority }: { mix: Mix; queue: Mix[]; prio
 					fetchPriority={priority ? "high" : "auto"}
 					className="w-full h-full object-cover group-hover:scale-105 duration-200"
 				/>
-				{isActive && <div ref={containerRef} className="absolute inset-0 z-10" />}
+				{isActive && (
+					<div ref={containerRef} className="absolute inset-0 z-10" />
+				)}
 				<span className="absolute bottom-1.5 right-1.5 z-20 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
-					{formatDuration(mix.duration_seconds)}
+					{formatHoursMinutes(mix.duration_seconds)}
 				</span>
 			</div>
 
