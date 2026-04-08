@@ -62,7 +62,6 @@ class MixSearchResponse(BaseModel):
     """Paginated search results."""
 
     mixes: list[MixResponse]
-    total: int
     limit: int
     offset: int
 
@@ -88,4 +87,3 @@ class AiSearchResponse(BaseModel):
 
     inferred: AiSearchInferred
     mixes: list[MixResponse]
-    total: int

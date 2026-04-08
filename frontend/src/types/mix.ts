@@ -26,7 +26,6 @@ export interface Mix {
 
 export interface SearchResponse {
 	mixes: Mix[];
-	total: number;
 	limit: number;
 	offset: number;
 }
@@ -42,5 +41,4 @@ export interface AiSearchInferred {
 export interface AiSearchResponse {
 	inferred: AiSearchInferred;
 	mixes: Mix[];
-	total: number;
 }

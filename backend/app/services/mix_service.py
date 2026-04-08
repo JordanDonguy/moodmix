@@ -30,17 +30,17 @@ class MixService:
         seed: float,
         limit: int,
         offset: int,
-    ) -> tuple[list[Mix], int]:
-        """Search mixes by mood values and filters. Returns (mixes, total_count).
+    ) -> list[Mix]:
+        """Search mixes by mood values and filters.
 
         Strategy based on how many sliders are active:
         - 0 sliders: random browse (seeded for stable pagination)
         - 1-2 sliders: range filter + weighted random (auto-widens if sparse)
-        - 3 sliders: pgvector L2 distance, total bounded by candidate pool
+        - 3 sliders: pgvector L2 distance
         """
         n_active = self._count_active_sliders(mood, energy, instrumentation)
 
-        candidates, total = await self._collect_candidates(
+        candidates = await self._collect_candidates(
             mood, energy, instrumentation, genres, instrumental,
             n_active=n_active, seed=seed, offset=offset, limit=limit,
         )
@@ -49,10 +49,9 @@ class MixService:
         page_ids = interleaved[offset : offset + limit]
 
         if not page_ids:
-            return [], total
+            return []
 
-        mixes = await self._hydrate_mixes(page_ids)
-        return mixes, total
+        return await self._hydrate_mixes(page_ids)
 
     @staticmethod
     def _count_active_sliders(
@@ -74,15 +73,12 @@ class MixService:
         seed: float,
         offset: int,
         limit: int,
-    ) -> tuple[list[tuple[UUID, str]], int]:
+    ) -> list[tuple[UUID, str]]:
         """Fetch candidate (mix_id, channel_name) tuples in relevance order.
 
         For 1-2 slider searches, progressively widens the range tolerance until
         the candidate pool is large enough to fill the requested page. Other
         strategies make a single pass.
-
-        Returns (candidates, total). For 3-slider searches, total is capped at
-        pool_size since pgvector k-NN bounds the searchable universe.
         """
         # 1-2 slider searches may need to widen the range if the initial tight
         # search is too sparse. Other strategies always make a single pass.
@@ -94,7 +90,6 @@ class MixService:
 
         candidates: list[tuple[UUID, str]] = []
         seen_ids: set[UUID] = set()
-        total = 0
 
         for attempt, tolerance in enumerate(tolerances):
             where_clause, order_by = self._build_query(
@@ -104,17 +99,6 @@ class MixService:
             # Re-seed Postgres's RANDOM() at the start of each attempt so the
             # jitter sequence is deterministic for this (seed, tolerance) pair.
             await self._db.execute(text(f"SELECT SETSEED({seed})"))
-
-            # How many mixes match the filters (used for the UI total count).
-            count_result = await self._db.execute(
-                text(f"SELECT COUNT(*) FROM mixes m WHERE {where_clause}")
-            )
-            total = count_result.scalar_one()
-
-            # 3-slider k-NN is bounded by pool_size, not the catalog count.
-            # Cap total so pagination stops at the edge of meaningful relevance.
-            if n_active == 3:
-                total = min(total, pool_size)
 
             # Fetch the top pool_size mixes ordered by relevance.
             id_result = await self._db.execute(
@@ -145,7 +129,7 @@ class MixService:
                     tolerances[attempt + 1], len(candidates),
                 )
 
-        return candidates, total
+        return candidates
 
     @staticmethod
     def _build_query(
