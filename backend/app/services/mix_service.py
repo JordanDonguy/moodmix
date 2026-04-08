@@ -35,43 +35,88 @@ class MixService:
 
         Strategy based on how many sliders are active:
         - 0 sliders: random browse (seeded for stable pagination)
-        - 1-2 sliders: range filter + weighted random (auto-widens if needed)
-        - 3 sliders: pgvector L2 distance
+        - 1-2 sliders: range filter + weighted random (auto-widens if sparse)
+        - 3 sliders: pgvector L2 distance, total bounded by candidate pool
         """
-        active = [v for v in [mood, energy, instrumentation] if v is not None]
-        n_active = len(active)
+        n_active = self._count_active_sliders(mood, energy, instrumentation)
 
-        # Set the random seed for stable pagination within a session
-        await self._db.execute(text(f"SELECT SETSEED({seed})"))
+        candidates, total = await self._collect_candidates(
+            mood, energy, instrumentation, genres, instrumental,
+            n_active=n_active, seed=seed, offset=offset, limit=limit,
+        )
 
-        # Try with progressively wider tolerances until we have enough results
+        interleaved = self._interleave_by_channel(candidates)
+        page_ids = interleaved[offset : offset + limit]
+
+        if not page_ids:
+            return [], total
+
+        mixes = await self._hydrate_mixes(page_ids)
+        return mixes, total
+
+    @staticmethod
+    def _count_active_sliders(
+        mood: float | None,
+        energy: float | None,
+        instrumentation: float | None,
+    ) -> int:
+        """Count how many mood sliders the user has set. Drives the search strategy."""
+        return sum(1 for v in (mood, energy, instrumentation) if v is not None)
+
+    async def _collect_candidates(
+        self,
+        mood: float | None,
+        energy: float | None,
+        instrumentation: float | None,
+        genres: list[str] | None,
+        instrumental: bool,
+        n_active: int,
+        seed: float,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[tuple[UUID, str]], int]:
+        """Fetch candidate (mix_id, channel_name) tuples in relevance order.
+
+        For 1-2 slider searches, progressively widens the range tolerance until
+        the candidate pool is large enough to fill the requested page. Other
+        strategies make a single pass.
+
+        Returns (candidates, total). For 3-slider searches, total is capped at
+        pool_size since pgvector k-NN bounds the searchable universe.
+        """
+        # 1-2 slider searches may need to widen the range if the initial tight
+        # search is too sparse. Other strategies always make a single pass.
         tolerances = [0.25, 0.5, 0.8] if n_active in (1, 2) else [0.25]
 
-        filtered_ids: list[tuple[UUID, str]] = []
-        total = 0
-        seen_ids: set[UUID] = set()
+        # Over-fetch: we need enough candidates that channel interleaving can
+        # still fill the requested page even when one channel dominates.
+        pool_size = max(500, (offset + limit) * 5)
 
-        for i, tolerance in enumerate(tolerances):
+        candidates: list[tuple[UUID, str]] = []
+        seen_ids: set[UUID] = set()
+        total = 0
+
+        for attempt, tolerance in enumerate(tolerances):
             where_clause, order_by = self._build_query(
                 mood, energy, instrumentation, genres, instrumental, n_active, tolerance,
             )
 
-            # Re-seed for each attempt so results stay stable
+            # Re-seed Postgres's RANDOM() at the start of each attempt so the
+            # jitter sequence is deterministic for this (seed, tolerance) pair.
             await self._db.execute(text(f"SELECT SETSEED({seed})"))
 
+            # How many mixes match the filters (used for the UI total count).
             count_result = await self._db.execute(
                 text(f"SELECT COUNT(*) FROM mixes m WHERE {where_clause}")
             )
             total = count_result.scalar_one()
 
-            # Scale candidate pool: need enough to fill the page after channel interleaving
-            pool_size = max(500, (offset + limit) * 5)
-
-            # 3-slider search is bounded by pool_size (the k-NN LIMIT), not the catalog
-            # count. Cap total so pagination stops at the edge of meaningful relevance
-            # instead of scrolling into low-quality tail results.
+            # 3-slider k-NN is bounded by pool_size, not the catalog count.
+            # Cap total so pagination stops at the edge of meaningful relevance.
             if n_active == 3:
                 total = min(total, pool_size)
+
+            # Fetch the top pool_size mixes ordered by relevance.
             id_result = await self._db.execute(
                 text(f"""
                     SELECT m.id, m.channel_name FROM mixes m
@@ -81,30 +126,26 @@ class MixService:
                 """),
             )
 
+            # Dedupe against earlier, narrower attempts. A wider tolerance
+            # includes everything the previous one did, plus more — keep the
+            # narrow ordering.
             for row in id_result.all():
                 mix_id: UUID = row[0]
                 if mix_id not in seen_ids:
-                    filtered_ids.append((mix_id, row[1]))
+                    candidates.append((mix_id, row[1]))
                     seen_ids.add(mix_id)
 
             # Enough results for the requested page? Stop widening.
-            if len(filtered_ids) >= offset + limit:
+            if len(candidates) >= offset + limit:
                 break
 
-            if i + 1 < len(tolerances):
+            if attempt + 1 < len(tolerances):
                 logger.debug(
                     "Widening search tolerance to ±%.2f (%d candidates so far)",
-                    tolerances[i + 1], len(filtered_ids),
+                    tolerances[attempt + 1], len(candidates),
                 )
 
-        interleaved = self._interleave_by_channel(filtered_ids)
-        mix_ids = interleaved[offset : offset + limit]
-
-        if not mix_ids:
-            return [], total
-
-        mixes = await self._hydrate_mixes(mix_ids)
-        return mixes, total
+        return candidates, total
 
     @staticmethod
     def _build_query(
