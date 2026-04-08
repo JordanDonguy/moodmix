@@ -97,22 +97,7 @@ class MixService:
                     tolerances[i + 1], len(filtered_ids),
                 )
 
-        # Round-robin by channel for diversity: preserves relevance order within each
-        # channel, spreads channels across the result, and is fully deterministic so
-        # pagination stays stable.
-        buckets: dict[str, list[UUID]] = defaultdict(list)
-        channel_order: list[str] = []
-        for mix_id, channel in filtered_ids:
-            if channel not in buckets:
-                channel_order.append(channel)
-            buckets[channel].append(mix_id)
-
-        interleaved: list[UUID] = []
-        while any(buckets[c] for c in channel_order):
-            for c in channel_order:
-                if buckets[c]:
-                    interleaved.append(buckets[c].pop(0))
-
+        interleaved = self._interleave_by_channel(filtered_ids)
         mix_ids = interleaved[offset : offset + limit]
 
         if not mix_ids:
@@ -174,6 +159,38 @@ class MixService:
             order_by = f"({distance}) + (RANDOM() * {_JITTER})"
 
         return where_clause, order_by
+
+    @staticmethod
+    def _interleave_by_channel(candidates: list[tuple[UUID, str]]) -> list[UUID]:
+        """Round-robin interleave candidates by channel for visual diversity.
+
+        Groups candidates by channel (preserving their relevance order within
+        each group), then takes the top-ranked mix from each channel, then the
+        second-ranked from each, and so on. Fully deterministic so pagination
+        stays stable.
+
+        Example:
+            Input:  [(A1, "A"), (A2, "A"), (B1, "B"), (A3, "A"), (C1, "C")]
+            Groups: {"A": [A1, A2, A3], "B": [B1], "C": [C1]}
+            Output: [A1, B1, C1, A2, A3]
+        """
+        buckets: dict[str, list[UUID]] = defaultdict(list)
+        channel_order: list[str] = []  # first-seen order drives the rotation
+        for mix_id, channel in candidates:
+            if channel not in buckets:
+                channel_order.append(channel)
+            buckets[channel].append(mix_id)
+
+        # Walk the buckets rank by rank: first take every channel's top mix,
+        # then every channel's second mix, and so on. Channels without a mix
+        # at the current rank are skipped.
+        max_rank = max((len(buckets[c]) for c in channel_order), default=0)
+        interleaved: list[UUID] = []
+        for rank in range(max_rank):
+            for channel in channel_order:
+                if rank < len(buckets[channel]):
+                    interleaved.append(buckets[channel][rank])
+        return interleaved
 
     async def get_mix_by_id(self, mix_id: UUID) -> Mix | None:
         """Fetch a single mix with its genres."""
