@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     LLM_API_URL: str = ""
     ADMIN_API_KEY: str = ""
-    CORS_ORIGINS: str = "http://localhost:5173"
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173"
     ENV: str = "dev"
 
     @cached_property
