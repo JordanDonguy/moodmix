@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from uuid import UUID
 
 from sqlalchemy import func, select, text
@@ -34,8 +35,8 @@ class MixService:
 
         Strategy based on how many sliders are active:
         - 0 sliders: random browse (seeded for stable pagination)
-        - 1-2 sliders: range filter + weighted random
-        - 3 sliders: pgvector cosine similarity
+        - 1-2 sliders: range filter + weighted random (auto-widens if needed)
+        - 3 sliders: pgvector L2 distance
         """
         active = [v for v in [mood, energy, instrumentation] if v is not None]
         n_active = len(active)
@@ -43,77 +44,76 @@ class MixService:
         # Set the random seed for stable pagination within a session
         await self._db.execute(text(f"SELECT SETSEED({seed})"))
 
-        # Build genre filter subquery
-        genre_subquery = ""
-        if genres:
-            slugs = ", ".join(f"'{s}'" for s in genres)
-            genre_subquery = f"""
-                AND m.id IN (
-                    SELECT mg.mix_id FROM mix_genres mg
-                    JOIN genres g ON g.id = mg.genre_id
-                    WHERE g.slug IN ({slugs})
+        # Try with progressively wider tolerances until we have enough results
+        tolerances = [0.25, 0.5, 0.8] if n_active in (1, 2) else [0.25]
+
+        filtered_ids: list[tuple[UUID, str]] = []
+        total = 0
+        seen_ids: set[UUID] = set()
+
+        for i, tolerance in enumerate(tolerances):
+            where_clause, order_by = self._build_query(
+                mood, energy, instrumentation, genres, instrumental, n_active, tolerance,
+            )
+
+            # Re-seed for each attempt so results stay stable
+            await self._db.execute(text(f"SELECT SETSEED({seed})"))
+
+            count_result = await self._db.execute(
+                text(f"SELECT COUNT(*) FROM mixes m WHERE {where_clause}")
+            )
+            total = count_result.scalar_one()
+
+            # Scale candidate pool: need enough to fill the page after channel interleaving
+            pool_size = max(500, (offset + limit) * 5)
+
+            # 3-slider search is bounded by pool_size (the k-NN LIMIT), not the catalog
+            # count. Cap total so pagination stops at the edge of meaningful relevance
+            # instead of scrolling into low-quality tail results.
+            if n_active == 3:
+                total = min(total, pool_size)
+            id_result = await self._db.execute(
+                text(f"""
+                    SELECT m.id, m.channel_name FROM mixes m
+                    WHERE {where_clause}
+                    ORDER BY {order_by}
+                    LIMIT {pool_size}
+                """),
+            )
+
+            for row in id_result.all():
+                mix_id: UUID = row[0]
+                if mix_id not in seen_ids:
+                    filtered_ids.append((mix_id, row[1]))
+                    seen_ids.add(mix_id)
+
+            # Enough results for the requested page? Stop widening.
+            if len(filtered_ids) >= offset + limit:
+                break
+
+            if i + 1 < len(tolerances):
+                logger.debug(
+                    "Widening search tolerance to ±%.2f (%d candidates so far)",
+                    tolerances[i + 1], len(filtered_ids),
                 )
-            """
 
-        vocal_filter = "AND m.has_vocals = false" if instrumental else ""
-        availability_filter = "AND m.unavailable_at IS NULL"
-        classified_filter = "AND m.mood IS NOT NULL"
+        # Round-robin by channel for diversity: preserves relevance order within each
+        # channel, spreads channels across the result, and is fully deterministic so
+        # pagination stays stable.
+        buckets: dict[str, list[UUID]] = defaultdict(list)
+        channel_order: list[str] = []
+        for mix_id, channel in filtered_ids:
+            if channel not in buckets:
+                channel_order.append(channel)
+            buckets[channel].append(mix_id)
 
-        where_clause = f"1=1 {availability_filter} {classified_filter} {vocal_filter} {genre_subquery}"
+        interleaved: list[UUID] = []
+        while any(buckets[c] for c in channel_order):
+            for c in channel_order:
+                if buckets[c]:
+                    interleaved.append(buckets[c].pop(0))
 
-        if n_active == 3:
-            # Full vector search with random jitter
-            query_vector = f"[{mood},{energy},{instrumentation}]"
-            order_by = f"(m.mood_vector <=> '{query_vector}'::vector) + (RANDOM() * {_JITTER})"
-        elif n_active == 0:
-            # Pure random browse
-            order_by = "RANDOM()"
-        else:
-            # Partial: build ABS distance on active columns + jitter
-            parts: list[str] = []
-            if mood is not None:
-                where_clause += f" AND m.mood BETWEEN {mood - 0.25} AND {mood + 0.25}"
-                parts.append(f"ABS(m.mood - {mood})")
-            if energy is not None:
-                where_clause += f" AND m.energy BETWEEN {energy - 0.25} AND {energy + 0.25}"
-                parts.append(f"ABS(m.energy - {energy})")
-            if instrumentation is not None:
-                where_clause += f" AND m.instrumentation BETWEEN {instrumentation - 0.25} AND {instrumentation + 0.25}"
-                parts.append(f"ABS(m.instrumentation - {instrumentation})")
-            distance = " + ".join(parts)
-            order_by = f"({distance}) + (RANDOM() * {_JITTER})"
-
-        # Count query (before diversity cap — reflects true catalog size for this query)
-        count_result = await self._db.execute(
-            text(f"SELECT COUNT(*) FROM mixes m WHERE {where_clause}")
-        )
-        total: int = count_result.scalar_one()
-
-        # Fetch up to 500 candidates, then apply per-page diversity in Python.
-        # 500 candidates / 4 per channel = at least 125 unique channels worth of results,
-        # enough for many pages of pagination even with narrow searches.
-        id_result = await self._db.execute(
-            text(f"""
-                SELECT m.id, m.channel_name FROM mixes m
-                WHERE {where_clause}
-                ORDER BY {order_by}
-                LIMIT 500
-            """),
-        )
-        all_rows = id_result.all()
-
-        # Apply per-page diversity: max 4 per channel within the page window
-        channel_counts: dict[str, int] = {}
-        filtered_ids: list[UUID] = []
-        for row in all_rows:
-            mix_id: UUID = row[0]
-            channel: str = row[1]
-            if channel_counts.get(channel, 0) < 4:
-                filtered_ids.append(mix_id)
-                channel_counts[channel] = channel_counts.get(channel, 0) + 1
-
-        # Apply pagination on the filtered list
-        mix_ids = filtered_ids[offset : offset + limit]
+        mix_ids = interleaved[offset : offset + limit]
 
         if not mix_ids:
             return [], total
@@ -126,9 +126,54 @@ class MixService:
         )
         mixes_by_id = {m.id: m for m in result.scalars().all()}
 
-        # Return in the same order as the sorted IDs
         ordered = [mixes_by_id[mid] for mid in mix_ids if mid in mixes_by_id]
         return ordered, total
+
+    @staticmethod
+    def _build_query(
+        mood: float | None,
+        energy: float | None,
+        instrumentation: float | None,
+        genres: list[str] | None,
+        instrumental: bool,
+        n_active: int,
+        tolerance: float,
+    ) -> tuple[str, str]:
+        """Build WHERE clause and ORDER BY for a given tolerance."""
+        genre_subquery = ""
+        if genres:
+            slugs = ", ".join(f"'{s}'" for s in genres)
+            genre_subquery = f"""
+                AND m.id IN (
+                    SELECT mg.mix_id FROM mix_genres mg
+                    JOIN genres g ON g.id = mg.genre_id
+                    WHERE g.slug IN ({slugs})
+                )
+            """
+
+        vocal_filter = "AND m.has_vocals = false" if instrumental else ""
+        where_clause = f"1=1 AND m.unavailable_at IS NULL AND m.mood IS NOT NULL {vocal_filter} {genre_subquery}"
+
+        if n_active == 3:
+            query_vector = f"[{mood},{energy},{instrumentation}]"
+            order_by = f"(m.mood_vector <-> '{query_vector}'::vector) + (RANDOM() * {_JITTER})"
+        elif n_active == 0:
+            order_by = "RANDOM()"
+        else:
+            parts: list[str] = []
+            if mood is not None:
+                where_clause += f" AND m.mood BETWEEN {mood - tolerance} AND {mood + tolerance}"
+                parts.append(f"ABS(m.mood - {mood})")
+            if energy is not None:
+                where_clause += f" AND m.energy BETWEEN {energy - tolerance} AND {energy + tolerance}"
+                parts.append(f"ABS(m.energy - {energy})")
+            if instrumentation is not None:
+                where_clause += f" AND m.instrumentation BETWEEN {instrumentation - tolerance} AND {instrumentation + tolerance}"
+                parts.append(f"ABS(m.instrumentation - {instrumentation})")
+            distance = " + ".join(parts)
+            order_by = f"({distance}) + (RANDOM() * {_JITTER})"
+
+        return where_clause, order_by
 
     async def get_mix_by_id(self, mix_id: UUID) -> Mix | None:
         """Fetch a single mix with its genres."""
