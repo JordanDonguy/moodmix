@@ -103,16 +103,8 @@ class MixService:
         if not mix_ids:
             return [], total
 
-        # Fetch full Mix objects with genres eagerly loaded
-        result = await self._db.execute(
-            select(Mix)
-            .where(Mix.id.in_(mix_ids))
-            .options(selectinload(Mix.genres))
-        )
-        mixes_by_id = {m.id: m for m in result.scalars().all()}
-
-        ordered = [mixes_by_id[mid] for mid in mix_ids if mid in mixes_by_id]
-        return ordered, total
+        mixes = await self._hydrate_mixes(mix_ids)
+        return mixes, total
 
     @staticmethod
     def _build_query(
@@ -191,6 +183,20 @@ class MixService:
                 if rank < len(buckets[channel]):
                     interleaved.append(buckets[channel][rank])
         return interleaved
+
+    async def _hydrate_mixes(self, mix_ids: list[UUID]) -> list[Mix]:
+        """Fetch full Mix objects with genres eagerly loaded, preserving input order.
+
+        SQL `IN` does not preserve the input order, so we fetch into a dict
+        keyed by id and rebuild the list in the caller's order.
+        """
+        result = await self._db.execute(
+            select(Mix)
+            .where(Mix.id.in_(mix_ids))
+            .options(selectinload(Mix.genres))
+        )
+        mixes_by_id = {mix.id: mix for mix in result.scalars().all()}
+        return [mixes_by_id[mix_id] for mix_id in mix_ids if mix_id in mixes_by_id]
 
     async def get_mix_by_id(self, mix_id: UUID) -> Mix | None:
         """Fetch a single mix with its genres."""
