@@ -21,9 +21,15 @@ class CrawlerService:
         self._db = db
         self._youtube = youtube_client or YouTubeClient()
 
-    async def crawl_channel(self, channel_id: str, channel_name: str | None = None, max_videos: int = 200) -> tuple[int, int]:
+    async def crawl_channel(
+        self, channel_id: str, channel_name: str | None = None, max_videos: int = 200,
+        skip_category_filter: bool = False,
+    ) -> tuple[int, int]:
         """Crawl a channel for long embeddable music videos. Returns (mixes_found, mixes_added)."""
-        video_ids = await self._youtube.search_channel_videos(channel_id, max_results=max_videos)
+        video_ids = await self._youtube.search_channel_videos(
+            channel_id, max_results=max_videos,
+            skip_category_filter=skip_category_filter,
+        )
         logger.info("Found %d long embeddable videos in channel %s", len(video_ids), channel_id)
 
         # Filter out videos we already have (in mixes or skipped_videos)

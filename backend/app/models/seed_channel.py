@@ -17,4 +17,5 @@ class SeedChannel(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_crawled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     total_mixes_found: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    skip_category_filter: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
