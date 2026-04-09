@@ -61,6 +61,11 @@ class YouTubeClient:
         self._client = httpx.AsyncClient(timeout=30)
         self._quota_used = 0
 
+    @property
+    def quota_used(self) -> int:
+        """Estimated quota units consumed since this client was created."""
+        return self._quota_used
+
     async def _get(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
         params["key"] = self._api_key
         url = f"{YOUTUBE_API_BASE}/{endpoint}"
@@ -116,7 +121,7 @@ class YouTubeClient:
         return video_ids
 
     async def search_channel_videos(
-        self, channel_id: str, max_results: int = 200
+        self, channel_id: str, max_results: int = 200, skip_category_filter: bool = False,
     ) -> list[str]:
         """Search a channel for long, embeddable music videos, ordered by views."""
         video_ids: list[str] = []
@@ -129,10 +134,11 @@ class YouTubeClient:
                 "type": "video",
                 "videoDuration": "long",
                 "videoEmbeddable": "true",
-                "videoCategoryId": "10",  # Music category
                 "maxResults": min(50, max_results - len(video_ids)),
                 "order": "viewCount",
             }
+            if not skip_category_filter:
+                params["videoCategoryId"] = "10"  # Music category
             if page_token:
                 params["pageToken"] = page_token
 
@@ -149,7 +155,7 @@ class YouTubeClient:
         return video_ids
 
     async def get_video_details(
-        self, video_ids: list[str]
+        self, video_ids: list[str],
     ) -> tuple[list[MixMetadata], dict[str, tuple[str, str | None]]]:
         """Fetch full details for a list of video IDs (batched by 50).
         Returns (valid_mixes, skipped: {youtube_id: (reason, title)}).
@@ -206,6 +212,9 @@ class YouTubeClient:
             return None, "not_embeddable"
 
         # Filter: duration between 20 minutes and 4 hours
+        # Livestreams and premieres may have no duration field
+        if "duration" not in content:
+            return None, "no_duration"
         duration_seconds = parse_duration_to_seconds(content["duration"])
         if duration_seconds < 1200:
             return None, "too_short"

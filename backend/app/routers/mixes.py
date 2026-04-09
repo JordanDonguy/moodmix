@@ -42,7 +42,7 @@ async def search_mixes(
     genre_list = [g.strip() for g in genres.split(",")] if genres else None
 
     service = MixService(db)
-    mixes, total = await service.search_mixes(
+    mixes = await service.search_mixes(
         mood=mood,
         energy=energy,
         instrumentation=instrumentation,
@@ -55,7 +55,6 @@ async def search_mixes(
 
     return MixSearchResponse(
         mixes=[MixResponse.model_validate(m) for m in mixes],
-        total=total,
         limit=limit,
         offset=offset,
     )
@@ -84,7 +83,7 @@ async def ai_search(
     instrumental = bool(inferred.get("instrumental", False))
 
     service = MixService(db)
-    mixes, total = await service.search_mixes(
+    mixes = await service.search_mixes(
         mood=inferred.get("mood"),  # type: ignore[arg-type]
         energy=inferred.get("energy"),  # type: ignore[arg-type]
         instrumentation=inferred.get("instrumentation"),  # type: ignore[arg-type]
@@ -104,7 +103,6 @@ async def ai_search(
             instrumental=instrumental,
         ),
         mixes=[MixResponse.model_validate(m) for m in mixes],
-        total=total,
     )
 
 
