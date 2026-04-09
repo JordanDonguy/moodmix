@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from uuid import UUID
 
-from sqlalchemy import func, select, text
+from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -92,7 +92,7 @@ class MixService:
         seen_ids: set[UUID] = set()
 
         for attempt, tolerance in enumerate(tolerances):
-            where_clause, order_by = self._build_query(
+            where_clause, order_by, params = self._build_query(
                 mood, energy, instrumentation, genres, instrumental, n_active, tolerance,
             )
 
@@ -101,14 +101,15 @@ class MixService:
             await self._db.execute(text(f"SELECT SETSEED({seed})"))
 
             # Fetch the top pool_size mixes ordered by relevance.
-            id_result = await self._db.execute(
-                text(f"""
-                    SELECT m.id, m.channel_name FROM mixes m
-                    WHERE {where_clause}
-                    ORDER BY {order_by}
-                    LIMIT {pool_size}
-                """),
-            )
+            query = text(f"""
+                SELECT m.id, m.channel_name FROM mixes m
+                WHERE {where_clause}
+                ORDER BY {order_by}
+                LIMIT {pool_size}
+            """)
+            if "genre_slugs" in params:
+                query = query.bindparams(bindparam("genre_slugs", expanding=True))
+            id_result = await self._db.execute(query, params)
 
             # Dedupe against earlier, narrower attempts. A wider tolerance
             # includes everything the previous one did, plus more — keep the
@@ -140,18 +141,20 @@ class MixService:
         instrumental: bool,
         n_active: int,
         tolerance: float,
-    ) -> tuple[str, str]:
-        """Build WHERE clause and ORDER BY for a given tolerance."""
+    ) -> tuple[str, str, dict[str, list[str]]]:
+        """Build WHERE clause, ORDER BY, and bind params for a given tolerance."""
+        params: dict[str, list[str]] = {}
+
         genre_subquery = ""
         if genres:
-            slugs = ", ".join(f"'{s}'" for s in genres)
-            genre_subquery = f"""
+            genre_subquery = """
                 AND m.id IN (
                     SELECT mg.mix_id FROM mix_genres mg
                     JOIN genres g ON g.id = mg.genre_id
-                    WHERE g.slug IN ({slugs})
+                    WHERE g.slug IN :genre_slugs
                 )
             """
+            params["genre_slugs"] = genres
 
         vocal_filter = "AND m.has_vocals = false" if instrumental else ""
         where_clause = f"1=1 AND m.unavailable_at IS NULL AND m.mood IS NOT NULL {vocal_filter} {genre_subquery}"
@@ -175,7 +178,7 @@ class MixService:
             distance = " + ".join(parts)
             order_by = f"({distance}) + (RANDOM() * {_JITTER})"
 
-        return where_clause, order_by
+        return where_clause, order_by, params
 
     @staticmethod
     def _interleave_by_channel(candidates: list[tuple[UUID, str]]) -> list[UUID]:
