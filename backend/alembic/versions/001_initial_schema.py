@@ -40,7 +40,6 @@ def upgrade() -> None:
             ('Neo-Soul / R&B', 'neo-soul-r-and-b'),
             ('Jazz', 'jazz'),
             ('Ambient', 'ambient'),
-            ('Ambient', 'ambient'),
             ('Acoustic & Piano', 'acoustic-and-piano')
     """)
 

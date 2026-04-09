@@ -15,7 +15,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("DELETE FROM genres WHERE slug IN ('blues', 'environment', 'reggae-dub', 'downtempo', 'guitar')")
-    op.execute("INSERT INTO genres (name, slug) VALUES ('Acoustic & Piano', 'acoustic-and-piano')")
+    op.execute("INSERT INTO genres (name, slug) VALUES ('Acoustic & Piano', 'acoustic-and-piano') ON CONFLICT DO NOTHING")
 
 
 def downgrade() -> None:
