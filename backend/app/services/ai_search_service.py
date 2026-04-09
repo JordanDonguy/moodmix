@@ -37,8 +37,8 @@ Respond ONLY with the JSON object, no markdown, no explanation."""
 class AiSearchService:
     """Converts natural language queries into search parameters using an LLM."""
 
-    def __init__(self) -> None:
-        self._client = httpx.AsyncClient(timeout=15)
+    def __init__(self, client: httpx.AsyncClient | None = None) -> None:
+        self._client = client or httpx.AsyncClient(timeout=15)
         self._api_key = settings.LLM_API_KEY
         self._api_url = settings.LLM_API_URL
 

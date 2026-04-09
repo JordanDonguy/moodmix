@@ -41,7 +41,7 @@ async def crawl_channel(
         max_videos=request.max_videos,
     )
 
-    await crawler._youtube.close()
+    await crawler.close()
 
     return CrawlResponse(
         channel_id=request.channel_id,
@@ -65,7 +65,7 @@ async def crawl_search(
         max_results=max_results,
     )
 
-    await crawler._youtube.close()
+    await crawler.close()
 
     return CrawlResponse(
         channel_id="search",

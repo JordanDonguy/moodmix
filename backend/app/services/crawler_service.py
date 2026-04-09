@@ -21,6 +21,9 @@ class CrawlerService:
         self._db = db
         self._youtube = youtube_client or YouTubeClient()
 
+    async def close(self) -> None:
+        await self._youtube.close()
+
     async def crawl_channel(
         self, channel_id: str, channel_name: str | None = None, max_videos: int = 200,
         skip_category_filter: bool = False,
