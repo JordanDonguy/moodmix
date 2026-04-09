@@ -1,3 +1,4 @@
+import os
 from functools import cached_property
 
 from pydantic_settings import BaseSettings
@@ -16,7 +17,7 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": os.getenv("ENV_FILE", ".env")}
 
 
-settings = Settings()  # type: ignore[call-arg]  # DATABASE_URL loaded from .env at runtime
+settings = Settings()  # type: ignore[call-arg]  # DATABASE_URL loaded from env file at runtime

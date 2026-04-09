@@ -1,5 +1,6 @@
 import logging
 import random
+from collections.abc import AsyncGenerator
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -24,6 +25,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/mixes", tags=["mixes"])
 
 limiter = Limiter(key_func=get_remote_address)
+
+
+async def get_ai_search_service() -> AsyncGenerator[AiSearchService]:
+    """Factory for AiSearchService. Handles client lifecycle."""
+    service = AiSearchService()
+    try:
+        yield service
+    finally:
+        await service.close()
 
 
 @router.get("/search", response_model=MixSearchResponse)
@@ -66,17 +76,14 @@ async def ai_search(
     request: Request,  # required by slowapi for IP extraction
     body: AiSearchRequest,
     db: AsyncSession = Depends(get_db),
+    ai_service: AiSearchService = Depends(get_ai_search_service),
 ) -> AiSearchResponse:
     """Natural language search. LLM converts text to mood values, then searches."""
-    ai_service = AiSearchService()
-
     try:
         inferred = await ai_service.parse_query(body.query)
     except Exception as e:
         logger.error("AI search failed: %s: %s", type(e).__name__, e)
         raise AppException("AI search temporarily unavailable", 503) from e
-    finally:
-        await ai_service.close()
 
     # Use inferred values to search
     genre_list = inferred.get("genres", [])
