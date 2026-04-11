@@ -26,7 +26,9 @@ Example: mood=-0.5 with tolerance 0.25 → only mixes with mood between -0.75 an
 
 Inactive sliders are completely ignored — no filtering or sorting on those axes.
 
-**Tolerance widening**: if the initial ±0.25 range doesn't produce enough results to fill the requested page, the search automatically retries with ±0.5, then ±0.8. This prevents empty pages when sliders are set to sparse regions of the catalog. Candidates from narrower tolerances keep their relevance ranking — wider attempts only add new, lower-relevance matches.
+**Tolerance widening**: if the initial ±0.25 range doesn't fill the candidate pool, the search automatically retries with ±0.5, then ±0.8. This prevents thin or empty result sets when sliders are set to sparse regions of the catalog. Candidates from narrower tolerances keep their relevance ranking — wider attempts only add new, lower-relevance matches via dedup.
+
+The stopping condition (pool full) is **page-independent**: every page request runs the same tolerance sequence and builds the same candidate pool, which is critical for pagination stability.
 
 ### 3 sliders — pgvector L2 distance
 Uses the 3D mood vector `[mood, energy, instrumentation]` and PostgreSQL's pgvector `<->` operator (L2/Euclidean distance) to find the closest mixes in vector space. This is the most precise search mode.
@@ -60,13 +62,17 @@ This is fully deterministic (no randomness), so pagination stays stable. It maxi
 
 ## Candidate pool sizing
 
-The search over-fetches candidates to ensure the channel interleaving step has enough material to fill any requested page:
+The search fetches a **fixed** candidate pool of 1000 mixes per request, regardless of which page is being requested:
 
 ```
-pool_size = max(500, (offset + limit) * 5)
+_POOL_SIZE = 1000
 ```
 
-This scales with pagination depth — deeper pages trigger larger candidate pools so the interleave can still produce diverse results even when one channel dominates the relevance ranking.
+This fixed size is load-bearing for **pagination stability**. Every page request must build the exact same candidate list so that the channel interleaving produces identical ordering across pages — otherwise the round-robin shifts between page 1 and page 2, causing mixes to appear on multiple pages or disappear entirely.
+
+An earlier version scaled the pool with `max(500, (offset + limit) * 5)`, which deepened the pool for later pages. That broke interleaving stability: page 1 and page 2 could see different pool sizes, produce different round-robin orderings, and return overlapping results.
+
+1000 comfortably covers the full catalog after most filter combinations, and transferring ~1000 `(uuid, channel_name)` rows from PostgreSQL is negligible. Pagination naturally ends once the pool is exhausted.
 
 ## Pagination
 

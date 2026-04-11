@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 # Jitter factor added to distance score to shuffle mixes of equal relevance
 _JITTER = 0.3
 
+# Fixed candidate pool size. Must be page-independent — if it varied with the
+# requested offset, the channel interleaving would shift between pages and
+# cause duplicates/gaps. See docs/search-logic.md.
+_POOL_SIZE = 1000
+
 
 class MixService:
     """Handles all mix search and retrieval logic."""
@@ -42,7 +47,7 @@ class MixService:
 
         candidates = await self._collect_candidates(
             mood, energy, instrumentation, genres, instrumental,
-            n_active=n_active, seed=seed, offset=offset, limit=limit,
+            n_active=n_active, seed=seed,
         )
 
         interleaved = self._interleave_by_channel(candidates)
@@ -71,22 +76,19 @@ class MixService:
         instrumental: bool,
         n_active: int,
         seed: float,
-        offset: int,
-        limit: int,
     ) -> list[tuple[UUID, str]]:
         """Fetch candidate (mix_id, channel_name) tuples in relevance order.
 
         For 1-2 slider searches, progressively widens the range tolerance until
-        the candidate pool is large enough to fill the requested page. Other
-        strategies make a single pass.
+        the candidate pool is large enough. Other strategies make a single pass.
+
+        The pool size and stopping condition are fixed (independent of the
+        requested page) so that every page request builds the same candidate
+        list and the interleaving stays stable across pages.
         """
         # 1-2 slider searches may need to widen the range if the initial tight
         # search is too sparse. Other strategies always make a single pass.
         tolerances = [0.25, 0.5, 0.8] if n_active in (1, 2) else [0.25]
-
-        # Over-fetch: we need enough candidates that channel interleaving can
-        # still fill the requested page even when one channel dominates.
-        pool_size = max(500, (offset + limit) * 5)
 
         candidates: list[tuple[UUID, str]] = []
         seen_ids: set[UUID] = set()
@@ -100,12 +102,11 @@ class MixService:
             # jitter sequence is deterministic for this (seed, tolerance) pair.
             await self._db.execute(text(f"SELECT SETSEED({seed})"))
 
-            # Fetch the top pool_size mixes ordered by relevance.
             query = text(f"""
                 SELECT m.id, m.channel_name FROM mixes m
                 WHERE {where_clause}
                 ORDER BY {order_by}
-                LIMIT {pool_size}
+                LIMIT {_POOL_SIZE}
             """)
             if "genre_slugs" in params:
                 query = query.bindparams(bindparam("genre_slugs", expanding=True))
@@ -120,8 +121,9 @@ class MixService:
                     candidates.append((mix_id, row[1]))
                     seen_ids.add(mix_id)
 
-            # Enough results for the requested page? Stop widening.
-            if len(candidates) >= offset + limit:
+            # Pool is full? Stop widening. Stopping condition is page-
+            # independent so every page request builds the same pool.
+            if len(candidates) >= _POOL_SIZE:
                 break
 
             if attempt + 1 < len(tolerances):
