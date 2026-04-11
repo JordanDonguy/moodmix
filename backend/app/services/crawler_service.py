@@ -35,7 +35,35 @@ class CrawlerService:
         )
         logger.info("Found %d long embeddable videos in channel %s", len(video_ids), channel_id)
 
-        # Filter out videos we already have (in mixes or skipped_videos)
+        return await self._process_video_ids(video_ids, channel_id, channel_name)
+
+    async def crawl_channel_via_playlist(
+        self, channel_id: str, channel_name: str | None = None, max_videos: int = 2000,
+    ) -> tuple[int, int]:
+        """Crawl a channel via its uploads playlist.
+
+        Unlike search.list (capped at ~500 results per channel), playlistItems
+        returns every upload. Server-side filters like videoDuration/category
+        don't apply here — get_video_details will filter client-side by
+        duration, embeddability, and view count.
+
+        Use this for deep recrawls of channels where search.list missed content
+        beyond the top-500 by views. Returns (mixes_found, mixes_added).
+        """
+        uploads_playlist = await self._youtube.get_channel_uploads_playlist(channel_id)
+        if not uploads_playlist:
+            logger.warning("No uploads playlist found for channel %s", channel_id)
+            return 0, 0
+
+        video_ids = await self._youtube.get_playlist_video_ids(uploads_playlist, max_results=max_videos)
+        logger.info("Found %d videos in uploads playlist for channel %s", len(video_ids), channel_id)
+
+        return await self._process_video_ids(video_ids, channel_id, channel_name)
+
+    async def _process_video_ids(
+        self, video_ids: list[str], channel_id: str, channel_name: str | None,
+    ) -> tuple[int, int]:
+        """Shared post-discovery pipeline: dedupe, fetch details, insert, update stats."""
         video_ids = await self._filter_known(video_ids)
         if not video_ids:
             logger.info("No new videos to process for channel %s", channel_id)
@@ -49,7 +77,6 @@ class CrawlerService:
         added = await self._insert_mixes(mixes)
         await self._insert_skipped(skipped)
 
-        # Upsert seed channel record with updated stats
         await self._update_seed_channel(channel_id, channel_name, added)
 
         return len(mixes), added
