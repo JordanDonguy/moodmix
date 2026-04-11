@@ -55,8 +55,10 @@ class Mix(Base):
     validated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
-    unavailable_at: Mapped[datetime | None] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+    )
+    unavailable_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Relationships
     genres: Mapped[list["Genre"]] = relationship(  # noqa: F821
