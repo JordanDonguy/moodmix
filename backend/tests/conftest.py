@@ -11,6 +11,7 @@ Fixtures are reusable setup/teardown logic:
 
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -22,11 +23,23 @@ from app.database import get_db
 from app.main import app
 from app.models.genre import Genre
 from app.models.mix import Mix
+from app.services.youtube_client import YouTubeClient
 
 
 @pytest.fixture(scope="session")
 def anyio_backend():
     return "asyncio"
+
+
+@pytest.fixture
+def mock_youtube_client() -> AsyncMock:
+    """Provide a mock YouTubeClient for crawler service tests.
+
+    All async methods are AsyncMock instances — set return values per test:
+        mock_youtube_client.search_channel_videos.return_value = ["vid1", "vid2"]
+        mock_youtube_client.get_video_details.return_value = ([mix1, mix2], {})
+    """
+    return AsyncMock(spec=YouTubeClient)
 
 
 @pytest.fixture
@@ -36,6 +49,13 @@ async def db() -> AsyncGenerator[AsyncSession]:
     Every test gets a real Postgres session wrapped in a transaction.
     After the test, the transaction rolls back - no test data leaks
     between tests, and the DB stays clean.
+
+    The session uses join_transaction_mode="create_savepoint" so that any
+    session.commit() calls inside services (e.g. report_unavailable,
+    add_channel) commit a savepoint instead of the outer transaction, which
+    keeps test isolation intact.
+    It's basically a transaction within a transaction, so when service calls commit(), 
+    the outer transaction is unaffected and can still roll back everything at the end of the test.
     """
     # Fresh engine per test to avoid asyncio event loop conflicts
     test_engine = create_async_engine(
@@ -47,7 +67,11 @@ async def db() -> AsyncGenerator[AsyncSession]:
     async with test_engine.connect() as conn:
         # Open a transaction that wraps the entire test
         txn = await conn.begin()
-        session = AsyncSession(bind=conn, expire_on_commit=False)
+        session = AsyncSession(
+            bind=conn,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
 
         try:
             yield session  # ← test runs here
@@ -172,7 +196,7 @@ async def seeded_db(db: AsyncSession) -> AsyncSession:
             mood_vector=[0.5, 0.5, 0.5],
             has_vocals=False,
             view_count=5000,
-            unavailable_at=datetime(2025, 4, 1),  # naive - model column has no timezone
+            unavailable_at=datetime(2025, 4, 1, tzinfo=timezone.utc),
             published_at=datetime(2025, 1, 15, tzinfo=timezone.utc),
             genres=[],
         ),
