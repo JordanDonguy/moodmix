@@ -111,6 +111,27 @@ async def client(db: AsyncSession) -> AsyncGenerator[httpx.AsyncClient]:
 
 
 @pytest.fixture
+async def seeded_client(seeded_db: AsyncSession) -> AsyncGenerator[httpx.AsyncClient]:
+    """HTTP test client backed by the seeded database.
+
+    Use this instead of `client` when tests need pre-existing mixes to be present.
+    Shares the same seeded_db session so you can query IDs within the test.
+    """
+    async def override_get_db() -> AsyncGenerator[AsyncSession]:
+        yield seeded_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+    ) as c:
+        yield c
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
 async def seeded_db(db: AsyncSession) -> AsyncSession:
     """Provide a DB session pre-loaded with test mixes and genres.
 

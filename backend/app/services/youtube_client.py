@@ -56,9 +56,9 @@ def parse_chapters(description: str | None) -> list[Chapter] | None:
 class YouTubeClient:
     """Low-level YouTube Data API v3 client."""
 
-    def __init__(self) -> None:
+    def __init__(self, client: httpx.AsyncClient | None = None) -> None:
         self._api_key = settings.YOUTUBE_API_KEY
-        self._client = httpx.AsyncClient(timeout=30)
+        self._client = client or httpx.AsyncClient(timeout=30)
         self._quota_used = 0
 
     @property
