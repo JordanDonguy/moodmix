@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqladmin import Admin, ModelView, action
 from starlette.requests import Request
@@ -9,7 +9,7 @@ from starlette.responses import RedirectResponse
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
-from sqlalchemy import select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.database import async_session, engine
@@ -35,6 +35,27 @@ class MixAdmin(ModelView, model=Mix):
         Mix.created_at,
     ]
     column_searchable_list = [Mix.title, Mix.channel_name, Mix.youtube_id]
+
+    def search_query(self, stmt: Select[Any], term: str) -> Select[Any]:  # type: ignore[override]
+        """Search on title, channel, youtube_id, and genre name.
+
+        Uses a subquery for genre matching to avoid joins on the main statement
+        (which would cause cartesian products and break sqladmin's COUNT pagination).
+        """
+        genre_ids = (
+            select(mix_genres.c.mix_id)
+            .join(Genre, Genre.id == mix_genres.c.genre_id)
+            .where(Genre.name.ilike(f"%{term}%"))
+            .scalar_subquery()
+        )
+        return stmt.where(
+            or_(
+                Mix.title.ilike(f"%{term}%"),
+                Mix.channel_name.ilike(f"%{term}%"),
+                Mix.youtube_id.ilike(f"%{term}%"),
+                Mix.id.in_(genre_ids),
+            )
+        )
     column_sortable_list = [
         Mix.title, Mix.channel_name, Mix.mood, Mix.energy,
         Mix.instrumentation, Mix.validated, Mix.view_count, Mix.created_at,

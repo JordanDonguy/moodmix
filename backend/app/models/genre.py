@@ -24,3 +24,6 @@ class Genre(Base):
     mixes: Mapped[list["Mix"]] = relationship(  # noqa: F821
         secondary="mix_genres", back_populates="genres"
     )
+
+    def __str__(self) -> str:
+        return self.name
