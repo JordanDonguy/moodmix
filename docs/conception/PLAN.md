@@ -8,7 +8,7 @@ Build an app that helps users find 1-hour background instrumental music mixes (f
 
 ## Architecture Overview
 
-**Stack:** Python FastAPI (API + data pipeline) + Supabase PostgreSQL (pgvector) + React SPA (Vite + TS) + YouTube Data API v3 + LLM classification
+**Stack:** Python FastAPI (API + data pipeline) + PostgreSQL (pgvector, self-hosted) + React SPA (Vite + TS) + YouTube Data API v3 + LLM classification
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -32,7 +32,7 @@ Build an app that helps users find 1-hour background instrumental music mixes (f
           │                    │
           ▼                    ▼
 ┌─────────────────────────────────────────────┐
-│   Supabase PostgreSQL                       │
+│   PostgreSQL (pgvector, Docker)             │
 │   - pgvector extension                      │
 │   - mixes table + HNSW index                │
 │   - seed_channels table                     │
@@ -94,7 +94,7 @@ moodmix/
 │   ├── server.py                           -- MCP server entrypoint
 │   └── tools.py                            -- Tool definitions (search, stats, admin)
 ├── frontend/                               -- React SPA (Vite + TS)
-├── docker-compose.yml                      -- FastAPI + Celery worker + Celery Beat + Redis
+├── docker-compose.prod.yml                 -- PostgreSQL (pgvector) + FastAPI API
 └── README.md
 ```
 
@@ -113,11 +113,10 @@ moodmix/
 - `mcp` — MCP server SDK for AI agent integration
 - `pytest` + `pytest-asyncio` + `httpx` — Testing
 
-### Connecting to Supabase
-- Supabase exposes a standard PostgreSQL connection string
-- Configure in `.env` with the Supabase direct connection URL (not the pooler — SQLAlchemy async needs a direct connection)
-- Use `asyncpg` driver: `postgresql+asyncpg://...`
-- pgvector extension must be enabled in Supabase dashboard
+### Database connection
+- Self-hosted PostgreSQL with pgvector extension, running in Docker (`pgvector/pgvector:pg17`)
+- Configure in `.env` with `DATABASE_URL=postgresql+asyncpg://...`
+- Uses `asyncpg` driver for async SQLAlchemy
 
 ---
 
@@ -164,9 +163,8 @@ Two-phase approach:
 
 **Phase A — Initial seed (2,000-5,000 mixes): Claude Code + JSON file**
 - Crawler exports pending mixes to a JSON file
-- Use Claude Code (free with Max plan) to read the file and classify in batches of ~50-100
-- Output written to a result JSON, then imported into Supabase
-- No API cost — covered by Max subscription
+- Use Claude Code to read the file and classify in batches of ~50-100
+- Output written to a result JSON, then imported into PostgreSQL
 
 **Phase B — Ongoing automated classification (~100 mixes/day): `classifier_service.py`**
 - Input: title, description, tags, channel name
@@ -209,7 +207,7 @@ Respond as JSON only.
 - Track play-through vs. skip (implicit signal)
 - Periodically re-calibrate vectors
 
-### Step 3 — Storage: pgvector on Supabase
+### Step 3 — Storage: pgvector on PostgreSQL
 
 **Alembic migration:**
 ```sql
@@ -370,7 +368,7 @@ POST /api/admin/channels
 
 ---
 
-## Part 3b: Python / FastAPI Patterns (recruiter-visible skills)
+## Part 3b: Python / FastAPI Patterns
 
 ### API key authentication — FastAPI `Depends()`
 - Public endpoints: `/api/mixes/**`, `/api/genres`, `/api/health`
@@ -562,7 +560,7 @@ The app is free and self-explanatory. Let users play music within seconds. A lan
 ### Phase 2 — Data Pipeline
 7. `crawler_service.py` — channel crawl + keyword search via `httpx`
 8. Export crawled mixes as JSON → classify initial seed via Claude Code (batches of ~50-100)
-9. Import classified results into Supabase
+9. Import classified results into PostgreSQL
 10. `classifier_service.py` — automated LLM classification (Haiku or OSS GPT-120B) for ongoing new mixes
 
 ### Phase 3 — API layer
@@ -616,7 +614,7 @@ The app is free and self-explanatory. Let users play music within seconds. A lan
 45. MCP server exposing catalog tools for AI agents (Claude Desktop, Claude Code, etc.)
 46. Read tools: `search_mixes`, `get_mix_stats`, `get_catalog_analytics`, `get_low_confidence_mixes`
 47. Write tools: `add_seed_channel`, `trigger_crawl`, `update_mix_classification`
-48. Connects to the same Supabase DB and reuses existing service logic
+48. Connects to the same PostgreSQL DB and reuses existing service logic
 49. Separate entrypoint (can run alongside or independently of the FastAPI server)
 
 ### Phase 11 — Refinement (future)
@@ -629,30 +627,32 @@ The app is free and self-explanatory. Let users play music within seconds. A lan
 ## Deployment
 
 ### Backend: Docker + GitHub Actions → Hetzner VPS
-- `Dockerfile` in `backend/` — multi-stage build (install deps → copy app → run with uvicorn)
-- GitHub Actions pipeline: on push to `main` → build image → push to GitHub Container Registry (ghcr.io) → SSH into VPS → pull & restart container
-- Docker Compose on VPS with 4 services:
-  - `api` — FastAPI + uvicorn (serves HTTP requests)
-  - `worker` — Celery worker (executes pipeline tasks: crawl, classify, availability check, analytics)
-  - `beat` — Celery Beat (scheduler, triggers tasks on cron schedule)
-  - `redis` — Redis (Celery broker + search result cache)
-- All services share the same image (different entrypoint commands)
-- Environment variables (Supabase URL, YouTube API key, LLM API key) via `.env` file on VPS, not in repo
+- `backend/Dockerfile` — multi-stage build (builder: compile asyncpg C extensions with uv → runtime: slim image with non-root user)
+- `backend/Dockerfile.test` — standalone single-stage build with dev deps, runs migrations + pytest
+- GitHub Actions pipeline:
+  - `test.yml`: on push/PR to `main` (path-filtered to `backend/**`) → runs tests in Docker via `docker compose -f docker-compose.test.yml run --rm --build test`
+  - `deploy.yml`: triggers via `workflow_run` after tests pass → SSH to VPS via `appleboy/ssh-action` → `command=` restriction runs `deploy.sh`
+- `deploy.sh` on VPS: `git pull` → backup current image → build new image → run migrations in temp container → bring up new version (rollback on migration failure)
+- Docker Compose on VPS (`docker-compose.prod.yml`):
+  - `db` — pgvector/pgvector:pg17 (healthcheck, persistent volume)
+  - `api` — FastAPI + uvicorn, bound to `127.0.0.1:8000`
+- Environment variables (DB password, API keys) via `.env` / `.env.prod` files on VPS, not in repo
+- VPS user `moodmix` with restricted sudoers (docker commands only) + SSH `command=` restriction
 
-### Frontend: Static build → VPS or Vercel
-- `vite build` → static files, served from the same VPS (nginx) or Vercel/Netlify free tier
-- Same GitHub Actions pipeline can handle both
+### Frontend: Cloudflare Pages
+- `vite build` → deployed to Cloudflare Pages
+- Production `VITE_API_URL` points to `https://api.moodmix.fm`
 
-### HTTPS + nginx (VPS already has nginx)
-- nginx reverse proxy: forwards requests to FastAPI container (e.g., localhost:8000)
-- SSL via Let's Encrypt (certbot) — required for frontend to call the API
-- Can also serve frontend static files from nginx directly
+### HTTPS + nginx
+- Cloudflare DNS proxy (A record `api` → VPS IP) handles public SSL
+- nginx reverse proxy on VPS: `api.moodmix.fm` → `127.0.0.1:8000`
+- Self-signed cert on VPS for Cloudflare Full SSL mode
+- Admin panel (`/admin/`) protected with sqladmin auth + Cloudflare WAF rate limiting on `/admin/login`
 
 ### Logging & monitoring
-- Python `logging` module with structured JSON output for crawler/classifier job status
-- `GET /api/health` endpoint — returns app status, DB connectivity, last crawler/classifier run timestamps
-- Log rotation on VPS to avoid disk fill
-- Optional: simple uptime monitoring (e.g., UptimeRobot free tier hitting /api/health)
+- Python `logging` module with structured output for crawler/classifier job status
+- `GET /api/health` endpoint — returns app status, DB connectivity, catalog size
+- Docker logs accessible via `docker compose logs`
 
 ---
 
@@ -660,25 +660,23 @@ The app is free and self-explanatory. Let users play music within seconds. A lan
 
 | Component | Cost |
 |-----------|------|
-| Supabase (free or Pro) | $0-25/mo |
+| PostgreSQL (self-hosted in Docker) | $0 |
 | YouTube Data API | Free (within 10K/day) |
-| LLM initial seed classification | Free (Claude Code Max plan) |
-| LLM ongoing classification (Haiku or OSS GPT-120B) | ~$0-0.10/mo |
+| LLM classification (Haiku or OSS GPT-120B) | ~$0-0.10/mo |
 | VPS (Hetzner — already owned, 2 vCPU / 4GB) | Already paid |
-| Frontend hosting (Vercel/Netlify/VPS) | Free tier |
-| **Total** | **~$0-25/mo** |
+| Frontend hosting (Cloudflare Pages) | Free tier |
+| Domain (moodmix.fm) | ~$10/yr |
+| **Total** | **~$0/mo** |
 
 ---
 
 ## Verification Plan
 
-1. **FastAPI**: App starts, connects to Supabase, Alembic migration runs successfully
+1. **FastAPI**: App starts, connects to PostgreSQL, Alembic migration runs successfully
 2. **Crawler**: Run on 5 seed channels → verify mixes appear in DB with correct metadata
 3. **Classifier**: Classify 50 mixes → manually spot-check 10 for reasonable vector values
 4. **API**: `GET /api/mixes/search?mood=-1&energy=-1&instrumentation=-1` returns dark/chill/organic mixes
 5. **AI search**: `POST /api/mixes/ai-search` with "upbeat electronic focus music" → plausible results
 6. **Frontend**: Sliders move → results update → click → YouTube embed plays
-7. **Redis**: Second identical search request returns cached result (check response time drop)
-8. **Celery**: Trigger crawl via admin endpoint → verify task appears in Celery worker logs → mixes appear in DB
-9. **Analytics**: `GET /api/admin/analytics` returns mood coverage report with gap recommendations
-10. **MCP**: Connect via Claude Desktop → ask "find me chill jazz mixes" → get results from catalog
+7. **CI/CD**: Push to `main` → tests pass → deploy triggers → new version live on VPS
+8. **Health**: `GET /api/health` returns healthy response with DB connectivity and catalog size

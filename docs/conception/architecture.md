@@ -3,51 +3,44 @@
 ## System overview
 
 ```
-                         ┌──────────────┐
-                         │   Browser    │
-                         │  React SPA   │
-                         └──────┬───────┘
-                                │ HTTPS
-                                ▼
-                         ┌──────────────┐
-                         │    nginx     │
-                         │  (reverse    │
-                         │   proxy +    │
-                         │   SSL +      │
-                         │   static)    │
-                         └──────┬───────┘
-                                │
-                 ┌──────────────┼──────────────┐
-                 │              │              │
-                 ▼              ▼              ▼
-          /api/*          /            MCP server
-          ┌──────────┐   static       ┌──────────┐
-          │ FastAPI  │   files        │ MCP SDK  │
-          │ (uvicorn)│                │ (stdio)  │
-          └────┬─────┘                └────┬─────┘
-               │                           │
-          ┌────┴─────────────┐             │
-          │                  │             │
-          ▼                  ▼             │
-   ┌────────────┐    ┌────────────┐        │
-   │   Redis    │    │  Celery    │        │
-   │  (cache +  │◄───│  worker +  │        │
-   │   broker)  │    │  beat      │        │
-   └────────────┘    └─────┬──────┘        │
-                           │               │
-                           ▼               ▼
-                    ┌─────────────────────────┐
-                    │  Supabase PostgreSQL    │
-                    │  (pgvector)             │
-                    └─────────────────────────┘
-                                │
-                    ┌───────────┴───────────┐
-                    ▼                       ▼
-             ┌────────────┐         ┌────────────┐
-             │ YouTube    │         │ LLM API    │
-             │ Data API   │         │ (Haiku /   │
-             │ v3         │         │  GPT-120B) │
-             └────────────┘         └────────────┘
+          ┌──────────────┐          ┌──────────────┐
+          │   Browser    │          │  Cloudflare  │
+          │  React SPA   │          │  Pages       │
+          │  (moodmix.fm)│          │  (frontend)  │
+          └──────┬───────┘          └──────────────┘
+                 │ HTTPS
+                 ▼
+          ┌──────────────┐
+          │  Cloudflare  │
+          │  Proxy (SSL) │
+          └──────┬───────┘
+                 │
+                 ▼
+          ┌──────────────┐
+          │    nginx     │
+          │  (reverse    │
+          │   proxy)     │
+          └──────┬───────┘
+                 │
+                 ▼
+          ┌──────────┐
+          │ FastAPI  │
+          │ (uvicorn)│
+          └────┬─────┘
+               │
+               ▼
+        ┌─────────────────────────┐
+        │  PostgreSQL (Docker)    │
+        │  pgvector/pgvector:pg17 │
+        └─────────────────────────┘
+                    │
+        ┌───────────┴───────────┐
+        ▼                       ▼
+ ┌────────────┐         ┌────────────┐
+ │ YouTube    │         │ LLM API    │
+ │ Data API   │         │ (Haiku /   │
+ │ v3         │         │  GPT-120B) │
+ └────────────┘         └────────────┘
 ```
 
 ## Tech stack
@@ -56,16 +49,13 @@
 
 | Technology | Role | Why |
 |---|---|---|
-| **Python 3.12+** | Language | Modern async support, rich AI/data ecosystem, fast to iterate |
+| **Python 3.14** | Language | Modern async support, rich AI/data ecosystem, fast to iterate |
 | **FastAPI** | Web framework | Async-native, auto OpenAPI docs, Pydantic validation, lightweight |
 | **uvicorn** | ASGI server | Production-grade, async, pairs with FastAPI |
 | **SQLAlchemy (async)** | ORM | Industry standard, async support via `asyncpg` driver |
 | **Alembic** | DB migrations | Native SQLAlchemy integration |
-| **Celery** | Task queue | Production-grade background jobs, scheduling via Beat |
-| **Redis** | Cache + broker | Search result caching (TTL), Celery message broker |
 | **httpx** | HTTP client | Async, modern, for YouTube API + LLM API calls |
 | **slowapi** | Rate limiting | FastAPI-native, per-IP limiting on AI search |
-| **pandas** | Data analysis | Catalog analytics: mood coverage, genre distribution, gap detection |
 | **pydantic-settings** | Configuration | Typed env vars, `.env` file support, validation at startup |
 | **pytest** | Testing | Unit + integration tests, async support via `pytest-asyncio` |
 
@@ -143,9 +133,8 @@ erDiagram
     genres ||--o{ mix_genres : "has"
 | Technology | Role | Why |
 |---|---|---|
-| **PostgreSQL 16+** | Primary database | Robust, supports pgvector extension |
-| **pgvector** | Vector similarity search | Cosine similarity on 3D mood vectors, HNSW index |
-| **Supabase** | Managed hosting | Free tier (500MB, 60 connections), managed backups, dashboard |
+| **PostgreSQL 17** | Primary database | Robust, supports pgvector extension |
+| **pgvector** | Vector similarity search | L2 distance on 3D mood vectors, HNSW index |
 
 ### Infrastructure
 
@@ -153,11 +142,11 @@ erDiagram
 |---|---|---|
 | **Hetzner VPS** | Server | 2 vCPU (Ampere), 4GB RAM — already owned |
 | **Docker** | Containerization | Reproducible builds, multi-service via docker-compose |
-| **Docker Compose** | Orchestration | 4 services: api, worker, beat, redis |
-| **nginx** | Reverse proxy | SSL termination, static file serving, already on VPS |
-| **Let's Encrypt** | SSL | Free HTTPS via certbot |
-| **GitHub Actions** | CI/CD | Build, test, deploy on push to main |
-| **ghcr.io** | Container registry | Free with GitHub, private images |
+| **Docker Compose** | Orchestration | 2 services: db (pgvector) + api (FastAPI) |
+| **nginx** | Reverse proxy | Forwards to FastAPI on localhost:8000, already on VPS |
+| **Cloudflare** | DNS + SSL + WAF | Proxy for public SSL, rate limiting on admin login |
+| **Cloudflare Pages** | Frontend hosting | Free tier, auto-deploys from git |
+| **GitHub Actions** | CI/CD | Test in Docker, deploy via SSH on push to main |
 
 ### External APIs
 
@@ -171,58 +160,50 @@ erDiagram
 
 | Technology | Role | Phase |
 |---|---|---|
+| **Celery + Redis** | Task queue + cache + broker | Phase 8 |
 | **MCP SDK** | AI agent integration (catalog admin via Claude Desktop) | Phase 10 |
 
-## Docker Compose services
+## Docker Compose services (production)
 
 ```yaml
-# Simplified overview — not the actual file
+# docker-compose.prod.yml
 services:
-  api:        # FastAPI + uvicorn (port 8000)
-  worker:     # Celery worker (crawl, classify, analytics tasks)
-  beat:       # Celery Beat (cron scheduler)
-  redis:      # Redis 7 (cache + Celery broker)
+  db:         # pgvector/pgvector:pg17 (healthcheck, persistent volume)
+  api:        # FastAPI + uvicorn (127.0.0.1:8000, env_file: .env.prod)
 ```
-
-All services share the same Docker image (different entrypoint commands).
-Supabase PostgreSQL is external (not in docker-compose).
 
 ## Data flow
 
 ### User searches (slider/genre)
 ```
-Browser → nginx → FastAPI → Redis cache?
-                                  ├─ HIT → return cached results
-                                  └─ MISS → pgvector query → Supabase → cache → return
+Browser → Cloudflare → nginx → FastAPI → pgvector query → PostgreSQL → return
 ```
 
 ### User searches (AI search bar)
 ```
-Browser → nginx → FastAPI → rate limit check
-                                  ├─ BLOCKED → 429
-                                  └─ OK → LLM API (text → mood vector)
-                                              → pgvector query → Supabase → return
+Browser → Cloudflare → nginx → FastAPI → rate limit check
+                                              ├─ BLOCKED → 429
+                                              └─ OK → LLM API (text → mood vector)
+                                                          → pgvector query → PostgreSQL → return
 ```
 
-### Pipeline: discover new mixes
+### Pipeline: discover new mixes (manual/scheduled)
 ```
-Celery Beat (cron) → Celery worker → YouTube Data API v3
-                                          → filter (duration, embeddable, views)
-                                          → insert into Supabase (status: pending mood_vector)
-```
-
-### Pipeline: classify pending mixes
-```
-Celery Beat (cron) → Celery worker → fetch pending mixes from Supabase
-                                          → LLM API (metadata → mood vector + genres + vocals)
-                                          → update mix in Supabase
-                                          → invalidate Redis cache
+crawler_service → YouTube Data API v3
+                      → filter (duration, embeddable, views)
+                      → insert into PostgreSQL
 ```
 
-### Pipeline: check availability
+### Pipeline: classify pending mixes (manual/scheduled)
 ```
-Celery Beat (cron) → Celery worker → fetch batch of mixes from Supabase
-                                          → YouTube Data API (videos.list)
-                                          → mark unavailable mixes
-                                          → invalidate Redis cache
+classifier_service → fetch pending mixes from PostgreSQL
+                          → LLM API (metadata → mood vector + genres + vocals)
+                          → update mix in PostgreSQL
+```
+
+### Pipeline: check availability (manual/scheduled)
+```
+crawler_service → fetch batch of mixes from PostgreSQL
+                      → YouTube Data API (videos.list)
+                      → mark unavailable mixes
 ```
