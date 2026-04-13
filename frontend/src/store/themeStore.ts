@@ -24,4 +24,8 @@ export const useThemeStore = create<ThemeState>()(
 
 export function applyTheme(theme: Theme): void {
 	document.documentElement.classList.toggle("dark", theme === "dark");
+	const meta = document.querySelector('meta[name="theme-color"]');
+	if (meta) {
+		meta.setAttribute("content", theme === "dark" ? "#0f0f0f" : "#ffffff");
+	}
 }
