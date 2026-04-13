@@ -23,10 +23,7 @@ export default function YouTubePlayer() {
 	const playerRef = useRef<YTPlayer | null>(null);
 	const readyRef = useRef(false);
 	const loadingRef = useRef(false);
-	const seekingRef = useRef(false);
 	const intervalRef = useRef<number>(0);
-	const playStartedAtRef = useRef(0);
-	const playStartedTimeRef = useRef(0);
 
 	const currentMix = usePlayerStore((s) => s.currentMix);
 	const isPlaying = usePlayerStore((s) => s.isPlaying);
@@ -34,14 +31,12 @@ export default function YouTubePlayer() {
 
 	const startTracking = useCallback(() => {
 		clearInterval(intervalRef.current);
-		playStartedAtRef.current = Date.now();
-		playStartedTimeRef.current = usePlayerStore.getState().currentTime;
 		intervalRef.current = window.setInterval(() => {
-			if (seekingRef.current) return;
-			const elapsed = (Date.now() - playStartedAtRef.current) / 1000;
-			const time = playStartedTimeRef.current + elapsed;
-			const store = usePlayerStore.getState();
-			store.setProgress(time, store.duration);
+			const player = playerRef.current;
+			if (!player) return;
+			const time = player.getCurrentTime();
+			const dur = player.getDuration() || usePlayerStore.getState().duration;
+			usePlayerStore.getState().setProgress(time, dur);
 		}, 500);
 	}, []);
 
@@ -243,23 +238,35 @@ export default function YouTubePlayer() {
 	// Seek
 	useEffect(() => {
 		const unsub = usePlayerStore.subscribe((state, prev) => {
-			if (
-				state.pendingSeek !== null &&
-				state.pendingSeek !== prev.pendingSeek
-			) {
-				seekingRef.current = true;
+			if (state.pendingSeek !== null && state.pendingSeek !== prev.pendingSeek) {
 				playerRef.current?.seekTo(state.pendingSeek, true);
 				usePlayerStore.setState({ pendingSeek: null });
-				playStartedAtRef.current = Date.now();
-				playStartedTimeRef.current = state.currentTime;
-				setTimeout(() => {
-					seekingRef.current = false;
-					startTracking();
-				}, 1000);
 			}
 		});
 		return unsub;
-	}, [startTracking]);
+	}, []);
+
+	// Resume playback when tab becomes visible (handles background-tab auto-advance)
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			if (document.hidden) return;
+			const { isPlaying: shouldPlay, next } = usePlayerStore.getState();
+			const player = playerRef.current;
+			if (!player || !readyRef.current) return;
+			const ytState = player.getPlayerState();
+			if (ytState === window.YT.PlayerState.ENDED) {
+				next();
+			} else if (
+				shouldPlay &&
+				ytState !== window.YT.PlayerState.PLAYING &&
+				ytState !== window.YT.PlayerState.BUFFERING
+			) {
+				player.playVideo();
+			}
+		};
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+	}, []);
 
 	// No visible DOM — player lives inside the active MixCard
 	return null;

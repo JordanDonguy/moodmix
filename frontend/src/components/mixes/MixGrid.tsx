@@ -39,8 +39,8 @@ export default function MixGrid() {
 
 	const currentMix = usePlayerStore((s) => s.currentMix);
 	const fetchedMixes = data?.pages.flatMap((p) => p.mixes) ?? [];
-	const allMixes = currentMix && !fetchedMixes.some((m) => m.id === currentMix.id)
-		? [currentMix, ...fetchedMixes]
+	const allMixes = currentMix
+		? [currentMix, ...fetchedMixes.filter((m) => m.id !== currentMix.id)]
 		: fetchedMixes;
 
 	// Infinite scroll sentinel
