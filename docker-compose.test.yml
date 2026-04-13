@@ -9,6 +9,22 @@ services:
       - "5434:5432"
     volumes:
       - pgdata-test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moodmix"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    env_file: ./backend/.env.test
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://moodmix:moodmix@db-test:5432/moodmix_test
+    depends_on:
+      db-test:
+        condition: service_healthy
 
 volumes:
   pgdata-test:
