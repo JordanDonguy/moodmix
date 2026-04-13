@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from sqladmin import Admin, ModelView, action
+from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
 from sqlalchemy import Select, or_, select
 from sqlalchemy.dialects.postgresql import insert
 
+from app.config import settings
 from app.database import async_session, engine
 from app.models.genre import Genre
 from app.models.mix import Mix
@@ -135,8 +137,26 @@ class SkippedVideoAdmin(ModelView, model=SkippedVideo):
     can_edit = False
 
 
+class AdminAuth(AuthenticationBackend):
+    async def login(self, request: Request) -> bool:
+        form = await request.form()
+        password = form.get("password", "")
+        if password == settings.ADMIN_API_KEY:
+            request.session.update({"authenticated": True})
+            return True
+        return False
+
+    async def logout(self, request: Request) -> bool:
+        request.session.clear()
+        return True
+
+    async def authenticate(self, request: Request) -> bool:
+        return request.session.get("authenticated", False)
+
+
 def setup_admin(app: FastAPI) -> None:
-    admin = Admin(app, engine)
+    auth = AdminAuth(secret_key=settings.ADMIN_API_KEY)
+    admin = Admin(app, engine, authentication_backend=auth)
     admin.add_view(MixAdmin)
     admin.add_view(SeedChannelAdmin)
     admin.add_view(GenreAdmin)
