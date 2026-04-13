@@ -2,124 +2,76 @@
 
 **Goal:** App running on Hetzner VPS, accessible via HTTPS, with CI/CD pipeline.
 
-**Depends on:** Sprint 5 (frontend + backend both working locally)
+**Depends on:** Sprint 5 (testing complete, backend + frontend working locally)
 
 ## Tasks
 
 ### 6.1 — Backend Dockerfile
-- [ ] `backend/Dockerfile` — multi-stage:
-  ```
-  Stage 1: python:3.12-slim — install deps via uv/pip
-  Stage 2: copy app code, expose port 8000
-  CMD: uvicorn app.main:app --host 0.0.0.0 --port 8000
-  ```
-- [ ] `.dockerignore` — exclude `.env`, `__pycache__`, tests, data/
-- [ ] Build and test locally: `docker build -t moodmix-api ./backend`
+- [x] `backend/Dockerfile` — multi-stage build:
+  - Stage 1 (builder): `python:3.14-slim` + `build-essential` (asyncpg C extensions) + uv dependency install (`--no-dev`)
+  - Stage 2 (runtime): slim image, copies `.venv` from builder, non-root `appuser`, exposes port 8000
+- [x] `backend/Dockerfile.test` — standalone single-stage build with all deps (including dev), runs migrations + pytest
+- [x] `backend/.dockerignore` — excludes `.venv`, `__pycache__`, `.env*`, `scripts/`, `data/`, `.coverage`
 
 ### 6.2 — Docker Compose
-- [ ] `docker-compose.yml` at project root:
-  ```yaml
-  services:
-    api:
-      build: ./backend
-      ports: ["8000:8000"]
-      env_file: .env
-    redis:
-      image: redis:7-alpine
-      ports: ["6379:6379"]
-  ```
-  (Celery worker + beat added in sprint 8)
-- [ ] Test locally: `docker compose up` → API accessible at localhost:8000
+- [x] `docker-compose.prod.yml`:
+  - `db`: pgvector/pgvector:pg17, healthcheck, persistent volume, `POSTGRES_PASSWORD` from `.env`
+  - `api`: builds from `./backend`, `env_file: ./backend/.env.prod`, bound to `127.0.0.1:8000`
+- [x] `docker-compose.test.yml` updated:
+  - `db-test`: pgvector/pgvector:pg17, healthcheck
+  - `test`: builds from `Dockerfile.test`, `DATABASE_URL` overridden for Docker network (`db-test:5432`)
 
-### 6.3 — Frontend build
-- [ ] `frontend/Dockerfile` (optional — or just build static files)
-- [ ] `npm run build` → `dist/` folder with static files
-- [ ] Configure Vite to use production API URL via env var
+### 6.3 — Frontend deployment
+- [x] Deployed to Cloudflare Pages
+- [x] Production `VITE_API_URL` points to `https://api.moodmix.fm`
 
-### 6.4 — nginx configuration
-- [ ] Create nginx config for VPS:
-  ```
-  server {
-      server_name moodmix.yourdomain.com;
-
-      # Frontend static files
-      location / {
-          root /var/www/moodmix/frontend;
-          try_files $uri $uri/ /index.html;
-      }
-
-      # API reverse proxy
-      location /api/ {
-          proxy_pass http://localhost:8000;
-          proxy_set_header Host $host;
-          proxy_set_header X-Real-IP $remote_addr;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      }
-  }
-  ```
-- [ ] SSL via certbot: `certbot --nginx -d moodmix.yourdomain.com`
+### 6.4 — nginx + SSL
+- [x] nginx reverse proxy on VPS: `api.moodmix.fm` → `127.0.0.1:8000`
+- [x] SSL via Cloudflare proxy (Full mode) + self-signed cert on VPS
+- [x] Cloudflare DNS: A record `api` → VPS IP (proxied)
+- [x] Admin panel (`/admin/`) protected with sqladmin `AuthenticationBackend` (password = `ADMIN_API_KEY`)
+- [x] Cloudflare WAF rate limit on `/admin/login` (2 req/10s per IP)
 
 ### 6.5 — GitHub Actions CI/CD
-- [ ] `.github/workflows/deploy.yml`:
-  - **Trigger:** push to `main`
-  - **Test job:** checkout → setup Python → install deps → run `pytest`
-  - **Build job:** (depends on test) build Docker image → push to ghcr.io
-  - **Deploy job:** (depends on build) SSH into VPS → pull new image → `docker compose up -d`
-- [ ] Store VPS SSH key + credentials as GitHub secrets
-- [ ] Store `.env` values as GitHub secrets or manage on VPS directly
+- [x] `.github/workflows/test.yml`:
+  - Triggers on push/PR to `main` (path-filtered to `backend/**`, `docker-compose.test.yml`, workflow file)
+  - Runs tests entirely in Docker: `docker compose -f docker-compose.test.yml run --rm --build test`
+- [x] `.github/workflows/deploy.yml`:
+  - Triggers via `workflow_run` after Test workflow passes on `main`
+  - Uses `appleboy/ssh-action` → VPS `moodmix` user → `command=` restriction runs `deploy.sh`
+- [x] GitHub secrets: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`
 
-### 6.6 — Frontend deployment
-- [ ] Option A: serve from nginx on VPS (copy `dist/` to `/var/www/moodmix/frontend/`)
-- [ ] Option B: deploy to Vercel/Netlify free tier
-- [ ] Add frontend build + deploy step to GitHub Actions pipeline
-- [ ] Either way: configure production `VITE_API_URL` to point to the VPS API
+### 6.6 — VPS user + SSH setup
+- [x] `moodmix` user with `/bin/bash`, restricted sudoers (docker commands only)
+- [x] `moodmix_deploy` SSH key with `command=` restriction in `authorized_keys` (forces `deploy.sh`, no PTY/port forwarding)
+- [x] Repo cloned at `/srv/moodmix`
 
-### 6.7 — Production .env setup
-- [ ] Create `.env` on VPS with production values:
-  - Supabase connection string
-  - YouTube API key
-  - LLM API key
-  - Admin API key
-  - CORS origins (production frontend URL)
-- [ ] Verify: `.env` is NOT in the repo
+### 6.7 — Deploy script
+- [x] `deploy.sh` at repo root (executable `100755`):
+  - `git pull` → backup current image as `:backup` → build new image
+  - Run migrations in temp container (`docker compose run --rm api alembic upgrade head`)
+  - Success: bring up new containers + prune old images
+  - Failure: rollback to backup image, `exit 1` (fails the GH Action)
 
-### 6.8 — Smoke test
-- [ ] Hit `https://moodmix.yourdomain.com` → frontend loads
-- [ ] Hit `https://moodmix.yourdomain.com/api/health` → healthy response
-- [ ] Test full flow: sliders → results → play mix
+### 6.8 — Production environment
+- [x] `/srv/moodmix/.env` with `POSTGRES_PASSWORD` (read by docker-compose variable substitution)
+- [x] `/srv/moodmix/backend/.env.prod` with `DATABASE_URL` (host = `db`, not `localhost`), API keys, CORS origins
+- [x] `.env` files NOT in repo (gitignored)
 
-### 6.9 — Automated classifier service (for ongoing catalog growth)
-- [ ] `app/services/classifier_service.py`
-- [ ] Define a `ClassifierStrategy` protocol (abstract interface):
-  ```python
-  class ClassifierStrategy(Protocol):
-      async def classify(self, metadata: MixMetadata) -> ClassificationResult: ...
-  ```
-- [ ] `HaikuClassifier(ClassifierStrategy)` — calls Claude Haiku API
-- [ ] `GptOssClassifier(ClassifierStrategy)` — calls OpenAI OSS GPT-120B API
-- [ ] `ClassifierService` class takes a `ClassifierStrategy` via constructor injection
-- [ ] `classify_mix(mix: Mix) -> ClassificationResult` — delegates to the strategy, parses JSON response
-- [ ] `classify_pending_batch(batch_size: int = 50)` — fetch unclassified mixes, classify each, update DB
-- [ ] Handle LLM response validation (check ranges, check genre slugs exist)
-- [ ] Handle LLM errors gracefully (retry once, then skip and log)
-- [ ] Which strategy to use is determined by `settings.LLM_PROVIDER` config value
+### 6.9 — Smoke test
+- [x] `https://api.moodmix.fm/api/health` responds healthy
+- [x] Admin panel requires login at `/admin/`
+- [x] DB seeded from local dump (`pg_dump --data-only` → `TRUNCATE CASCADE` → restore)
 
-> **Pattern: Strategy** — Swapping LLM providers (Haiku ↔ GPT-120B ↔ future models) requires zero changes to `ClassifierService` or any calling code. Just add a new strategy class and update config.
->
-> **Pattern: Dependency Injection** — `ClassifierService` receives its strategy via constructor, not by instantiating it internally. Makes testing trivial (inject a mock strategy).
+## Deferred to future sprints
 
-### 6.10 — Pipeline scheduler (APScheduler for now, Celery later in sprint 8)
-- [ ] `app/tasks/scheduler.py` — APScheduler setup
-- [ ] Scheduled jobs:
-  - Weekly: crawl all active seed channels
-  - Daily: run 30 keyword searches from a rotating query list
-  - Daily: check availability on random 200 mixes
-  - Daily: classify all pending mixes
-- [ ] Log each run to `pipeline_runs` table
+- **Classifier service** (strategy pattern, LLM-based classification) → Sprint 7
+- **Pipeline scheduler** (APScheduler/Celery, crawl + classify + availability checks) → Sprint 8
 
 ## Done when
 
-- [ ] `https://moodmix.yourdomain.com` serves the frontend
-- [ ] API responds behind HTTPS
-- [ ] Push to `main` triggers: test → build → deploy automatically
-- [ ] Docker containers running on VPS (`docker compose ps` shows api + redis healthy)
+- [x] `https://moodmix.fm` serves the frontend (Cloudflare Pages)
+- [x] API responds behind HTTPS at `https://api.moodmix.fm`
+- [x] Push to `main` triggers: test → deploy automatically
+- [x] Docker containers running on VPS (`docker compose ps` shows db + api healthy)
+- [x] Admin panel protected (auth + rate limiting)
