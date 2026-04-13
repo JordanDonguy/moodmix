@@ -2,6 +2,8 @@
 
 Background music discovery app. Find 1-hour YouTube mixes based on mood using 3 sliders (sad/happy, chill/dynamic, organic/electronic), genre filters, and an AI-powered natural language search.
 
+**Live:** https://moodmix.fm  
+
 ## Tech Stack
 
 ### Backend
