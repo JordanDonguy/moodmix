@@ -24,6 +24,7 @@ export default function YouTubePlayer() {
 	const readyRef = useRef(false);
 	const loadingRef = useRef(false);
 	const intervalRef = useRef<number>(0);
+	const overlayRef = useRef<HTMLDivElement | null>(null);
 
 	const currentMix = usePlayerStore((s) => s.currentMix);
 	const isPlaying = usePlayerStore((s) => s.isPlaying);
@@ -49,17 +50,16 @@ export default function YouTubePlayer() {
 		loadApi();
 	}, []);
 
-	// Create/recreate player when container changes
+	// Create stable overlay + YouTube player (lives on document.body, never moves)
 	useEffect(() => {
-		if (!playerContainer) {
-			if (playerRef.current) {
-				stopTracking();
-				playerRef.current.destroy();
-				playerRef.current = null;
-				readyRef.current = false;
-			}
-			return;
-		}
+		const overlay = document.createElement("div");
+		overlay.style.position = "fixed";
+		overlay.style.zIndex = "10";
+		overlay.style.overflow = "hidden";
+		overlay.style.borderRadius = "0.75rem";
+		overlay.style.display = "none";
+		document.body.appendChild(overlay);
+		overlayRef.current = overlay;
 
 		let cancelled = false;
 
@@ -68,19 +68,10 @@ export default function YouTubePlayer() {
 
 			const state = usePlayerStore.getState();
 
-			// Destroy existing player
-			if (playerRef.current) {
-				stopTracking();
-				playerRef.current.destroy();
-				playerRef.current = null;
-				readyRef.current = false;
-			}
-
-			// Create inner div for YT to replace with iframe
 			const innerDiv = document.createElement("div");
 			innerDiv.style.width = "100%";
 			innerDiv.style.height = "100%";
-			playerContainer.appendChild(innerDiv);
+			overlay.appendChild(innerDiv);
 
 			new window.YT.Player(innerDiv, {
 				width: "100%",
@@ -146,13 +137,42 @@ export default function YouTubePlayer() {
 				playerRef.current = null;
 				readyRef.current = false;
 			}
-			while (playerContainer.firstChild) {
-				playerContainer.removeChild(playerContainer.firstChild);
-			}
+			document.body.removeChild(overlay);
+			overlayRef.current = null;
 		};
-	}, [playerContainer, startTracking, stopTracking]);
+	}, [startTracking, stopTracking]);
 
-	// Load new video when currentMix changes (same container, different mix — e.g. auto-advance)
+	// Position overlay over the active card's thumbnail area (rAF loop
+	// so the overlay tracks grid reflows, not just scroll/resize)
+	useEffect(() => {
+		const overlay = overlayRef.current;
+		if (!overlay) return;
+
+		if (!playerContainer) {
+			overlay.style.display = "none";
+			return;
+		}
+
+		let rafId: number;
+		const update = () => {
+			const rect = playerContainer.getBoundingClientRect();
+			if (rect.bottom < 0 || rect.top > window.innerHeight) {
+				overlay.style.display = "none";
+			} else {
+				overlay.style.display = "block";
+				overlay.style.top = `${rect.top}px`;
+				overlay.style.left = `${rect.left}px`;
+				overlay.style.width = `${rect.width}px`;
+				overlay.style.height = `${rect.height}px`;
+			}
+			rafId = requestAnimationFrame(update);
+		};
+		rafId = requestAnimationFrame(update);
+
+		return () => cancelAnimationFrame(rafId);
+	}, [playerContainer]);
+
+	// Load new video when currentMix changes
 	useEffect(() => {
 		if (!readyRef.current || !playerRef.current || !currentMix) return;
 		loadingRef.current = true;
@@ -170,6 +190,28 @@ export default function YouTubePlayer() {
 			stopTracking();
 		}
 	}, [isPlaying, currentMix, startTracking, stopTracking]);
+
+	// Resume playback when tab becomes visible (handles background-tab auto-advance)
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			if (document.hidden) return;
+			const { isPlaying: shouldPlay, next } = usePlayerStore.getState();
+			const player = playerRef.current;
+			if (!player || !readyRef.current) return;
+			const ytState = player.getPlayerState();
+			if (ytState === window.YT.PlayerState.ENDED) {
+				next();
+			} else if (
+				shouldPlay &&
+				ytState !== window.YT.PlayerState.PLAYING &&
+				ytState !== window.YT.PlayerState.BUFFERING
+			) {
+				player.playVideo();
+			}
+		};
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+	}, []);
 
 	// OS media controls
 	useEffect(() => {
@@ -246,28 +288,6 @@ export default function YouTubePlayer() {
 		return unsub;
 	}, []);
 
-	// Resume playback when tab becomes visible (handles background-tab auto-advance)
-	useEffect(() => {
-		const handleVisibilityChange = () => {
-			if (document.hidden) return;
-			const { isPlaying: shouldPlay, next } = usePlayerStore.getState();
-			const player = playerRef.current;
-			if (!player || !readyRef.current) return;
-			const ytState = player.getPlayerState();
-			if (ytState === window.YT.PlayerState.ENDED) {
-				next();
-			} else if (
-				shouldPlay &&
-				ytState !== window.YT.PlayerState.PLAYING &&
-				ytState !== window.YT.PlayerState.BUFFERING
-			) {
-				player.playVideo();
-			}
-		};
-		document.addEventListener("visibilitychange", handleVisibilityChange);
-		return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-	}, []);
-
-	// No visible DOM — player lives inside the active MixCard
+	// No visible DOM — player lives in the fixed overlay
 	return null;
 }
