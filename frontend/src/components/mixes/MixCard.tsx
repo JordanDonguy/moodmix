@@ -102,7 +102,7 @@ export function MixCard({
 					className="w-full h-full object-cover group-hover:scale-105 duration-200"
 				/>
 				{isActive && (
-					<div ref={containerRef} className="absolute inset-0 z-10" />
+					<div ref={containerRef} className="absolute inset-0" />
 				)}
 				<span className="absolute bottom-1.5 right-1.5 z-20 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
 					{formatHoursMinutes(mix.duration_seconds)}
