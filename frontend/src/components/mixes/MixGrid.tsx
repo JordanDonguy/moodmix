@@ -7,8 +7,26 @@ import { useDebounce } from "../../hooks/useDebounce";
 import { usePlayerStore } from "../../store/playerStore";
 import { useSearchStore } from "../../store/searchStore";
 import { MixCard } from "./MixCard";
+import { MixSkeleton } from "./MixSkeleton";
 
 const PAGE_SIZE = 20;
+
+// Stable keys for skeleton placeholders. `visibility` progressively hides
+// items on smaller breakpoints so we don't pulse 12 nodes on mobile.
+const SKELETON_SLOTS: { key: string; visibility: string }[] = [
+	{ key: "sk-a", visibility: "" },
+	{ key: "sk-b", visibility: "" },
+	{ key: "sk-c", visibility: "" },
+	{ key: "sk-d", visibility: "" },
+	{ key: "sk-e", visibility: "hidden sm:flex" },
+	{ key: "sk-f", visibility: "hidden sm:flex" },
+	{ key: "sk-g", visibility: "hidden lg:flex" },
+	{ key: "sk-h", visibility: "hidden lg:flex" },
+	{ key: "sk-i", visibility: "hidden lg:flex" },
+	{ key: "sk-j", visibility: "hidden xl:flex" },
+	{ key: "sk-k", visibility: "hidden xl:flex" },
+	{ key: "sk-l", visibility: "hidden xl:flex" },
+];
 
 export default function MixGrid() {
 	const { mood, energy, instrumentation, genres, instrumental, seed } =
@@ -67,9 +85,19 @@ export default function MixGrid() {
 
 	return (
 		<div>
+			{/* ---- Loading skeletons ---- */}
 			{isLoading && (
-				<p className="text-text-muted text-sm text-center py-8">Loading...</p>
+				<output
+					className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+					aria-label="Loading mixes"
+				>
+					{SKELETON_SLOTS.map(({ key, visibility }) => (
+						<MixSkeleton key={key} className={visibility} />
+					))}
+				</output>
 			)}
+
+			{/* ---- Error state ---- */}
 			{error && (
 				<div className="text-center py-20 text-text-muted text-lg">
 					<img
@@ -82,6 +110,7 @@ export default function MixGrid() {
 				</div>
 			)}
 
+			{/* ---- Empty state ---- */}
 			{!isLoading && allMixes.length === 0 && data && (
 				<div className="text-center py-20 text-text-muted text-lg">
 					<img
@@ -94,6 +123,7 @@ export default function MixGrid() {
 				</div>
 			)}
 
+			{/* ---- Mix grid ---- */}
 			{allMixes.length > 0 && (
 				<>
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
