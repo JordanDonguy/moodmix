@@ -1,0 +1,17 @@
+# Hashed, immutable assets — cache forever
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Static files with stable paths — cache with revalidation
+/fonts/*
+  Cache-Control: public, max-age=2592000, must-revalidate
+
+/favicon/*
+  Cache-Control: public, max-age=2592000, must-revalidate
+
+# index.html must always revalidate so clients pick up new chunk hashes
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
