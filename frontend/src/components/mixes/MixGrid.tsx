@@ -2,6 +2,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { searchMixes } from "../../api/mixes";
+import { useAnchoredMixList } from "../../hooks/useAnchoredMixList";
 import { useDebounce } from "../../hooks/useDebounce";
 import { usePlayerStore } from "../../store/playerStore";
 import { useSearchStore } from "../../store/searchStore";
@@ -39,9 +40,7 @@ export default function MixGrid() {
 
 	const currentMix = usePlayerStore((s) => s.currentMix);
 	const fetchedMixes = data?.pages.flatMap((p) => p.mixes) ?? [];
-	const allMixes = currentMix && !fetchedMixes.some((m) => m.id === currentMix.id)
-		? [currentMix, ...fetchedMixes]
-		: fetchedMixes;
+	const allMixes = useAnchoredMixList(currentMix, fetchedMixes);
 
 	// Infinite scroll sentinel
 	const sentinelRef = useRef<HTMLDivElement>(null);
@@ -54,6 +53,8 @@ export default function MixGrid() {
 		[fetchNextPage, hasNextPage, isFetchingNextPage],
 	);
 
+	// Attach the sentinel 400px before it enters the viewport
+	// So we start fetching before user reaches the end of the list
 	useEffect(() => {
 		const el = sentinelRef.current;
 		if (!el) return;

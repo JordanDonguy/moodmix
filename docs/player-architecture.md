@@ -53,6 +53,28 @@ Browsers throttle background tabs and block autoplay. When a mix ends in a backg
 3. A `visibilitychange` listener detects when the tab becomes active again
 4. If the store says `isPlaying` but the YT player isn't playing, it calls `playVideo()`
 
+## Grid stability during search transitions
+
+When a mix is playing and the user changes filters, the currently playing mix may not appear in the new results. `MixGrid` delegates list composition to the [`useAnchoredMixList`](../frontend/src/hooks/useAnchoredMixList.ts) hook, which uses a rotation strategy to minimize visible card movement:
+
+### Cases
+
+1. **`currentMix` not in results** → prepend it: `[currentMix, ...fetched]`. The playing card stays visible at position 0 so the user can still see/control it.
+2. **`currentMix` in results, no previous prepend** → use fetched results as-is. This is the cold-start / normal-search case.
+3. **`currentMix` in results, was prepended last render** → transition case. Instead of dropping the prepended mix from position 0 (which would shift every visible card up by one), the last fetched mix is "anchored" at position 0. Positions 1..N stay stable. The anchor mix moves from the bottom of the loaded list to the top — imperceptible in infinite-scroll contexts.
+
+### Implementation
+
+The hook maintains two refs across renders:
+- `wasPrependingRef` — was the previous render prepending `currentMix`?
+- `anchorRef` — the mix pinned at position 0 (if any)
+
+The anchor is set on the prepending → not-prepending transition and persists until a new prepend starts (which invalidates it) or until the user plays the anchor itself (which drops it, accepting a one-time shift rather than pinning the playing mix at the top).
+
+### Why not just pin the playing mix at position 0?
+
+Early iteration. Rejected UX: clicking a mix deep in the list makes it "jump to the top," which is jarring when the user is browsing results. The rotation strategy keeps the playing mix in roughly its original position while still avoiding grid-wide shifts on transitions.
+
 ## Store shape (playerStore)
 
 | Field | Type | Purpose |
