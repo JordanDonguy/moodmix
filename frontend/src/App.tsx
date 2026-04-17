@@ -1,13 +1,18 @@
 import { lazy, Suspense, useEffect } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-import Navbar from "./components/layout/Navbar";
-import MixGrid from "./components/mixes/MixGrid";
-import QuickTags from "./components/search/QuickTags";
+import HomePage from "./pages/HomePage";
 import { usePlayerStore } from "./store/playerStore";
 
-const MobileNavbar = lazy(() => import("./components/layout/MobileNavbar"));
 const PlayerBar = lazy(() => import("./components/layout/PlayerBar"));
 const YouTubePlayer = lazy(() => import("./components/player/YouTubePlayer"));
+
+const InfoLayout = lazy(() => import("./pages/info/InfoLayout"));
+const AboutPage = lazy(() => import("./pages/info/AboutPage"));
+const HelpPage = lazy(() => import("./pages/info/HelpPage"));
+const PrivacyPage = lazy(() => import("./pages/info/PrivacyPage"));
+const TermsPage = lazy(() => import("./pages/info/TermsPage"));
+const ContactPage = lazy(() => import("./pages/info/ContactPage"));
 
 function useDocumentTitle() {
 	const currentMix = usePlayerStore((s) => s.currentMix);
@@ -41,15 +46,25 @@ export default function App() {
 
 	return (
 		<div className="min-h-screen bg-bg-primary">
-			<Navbar />
-			<Suspense>
-				<MobileNavbar />
-			</Suspense>
-			<QuickTags />
-
-			<main className="px-4 py-6 pb-24">
-				<MixGrid />
-			</main>
+			<Routes>
+				<Route path="/" element={<HomePage />} />
+				<Route
+					path="/info"
+					element={
+						<Suspense>
+							<InfoLayout />
+						</Suspense>
+					}
+				>
+					<Route index element={<Navigate to="about" replace />} />
+					<Route path="about" element={<AboutPage />} />
+					<Route path="help" element={<HelpPage />} />
+					<Route path="privacy" element={<PrivacyPage />} />
+					<Route path="terms" element={<TermsPage />} />
+					<Route path="contact" element={<ContactPage />} />
+				</Route>
+				<Route path="*" element={<Navigate to="/" replace />} />
+			</Routes>
 
 			<Suspense>
 				<PlayerBar />
