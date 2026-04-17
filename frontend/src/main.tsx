@@ -9,6 +9,13 @@ import { applyTheme, useThemeStore } from "./store/themeStore";
 // Apply stored theme before first render to avoid flash
 applyTheme(useThemeStore.getState().theme);
 
+// Auto-reload when cached JS chunks no longer exist after a deploy.
+// Vite's lazy imports will throw on stale hashes; a single reload fetches
+// the new index.html which points to the current chunks.
+window.addEventListener("vite:preloadError", () => {
+	window.location.reload();
+});
+
 const queryClient = new QueryClient({
 	defaultOptions: {
 		queries: {
