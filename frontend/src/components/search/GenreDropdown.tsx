@@ -130,7 +130,7 @@ export default function GenreDropdown({
 		<div ref={containerRef} className="relative">
 			{button}
 			{open && (
-				<div className="absolute top-full mt-2 left-0 z-50 bg-bg-secondary border border-border rounded-xl p-3 shadow-lg min-w-70">
+				<div className="absolute top-full mt-2 left-0 z-50 bg-bg-primary/98 border border-border rounded-xl p-3 shadow-lg min-w-70 animate-menu-open-top-left">
 					<GenreChips
 						selected={selected}
 						onToggle={onToggle}

@@ -105,3 +105,18 @@
 @utility animate-slide-up {
 	animation: slide-up 0.3s ease-out;
 }
+
+@keyframes menu-open {
+	from { opacity: 0; transform: translateY(-4px) scale(0.5); }
+	to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@utility animate-menu-open-top-right {
+	animation: menu-open 0.15s ease-out;
+	transform-origin: top right;
+}
+
+@utility animate-menu-open-top-left {
+	animation: menu-open 0.15s ease-out;
+	transform-origin: top left;
+}
