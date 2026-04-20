@@ -1,11 +1,11 @@
-import { Cpu, Drum, Moon, MoonStar, Sofa, Sun, Zap } from "lucide-react";
+import { Cpu, Drum, MoonStar, Sofa, Sun, Zap } from "lucide-react";
 import { useSearchStore } from "../../store/searchStore";
-import { useThemeStore } from "../../store/themeStore";
 import AiSearchBar from "../search/AiSearchBar";
 import GenreDropdown from "../search/GenreDropdown";
 import MoodSlider from "../search/MoodSlider";
 import ResetFilters from "../search/ResetFilters";
 import VocalToggle from "../search/VocalToggle";
+import AppMenu from "./AppMenu";
 
 export default function Navbar() {
 	const {
@@ -21,8 +21,6 @@ export default function Navbar() {
 		clearGenres,
 		setInstrumental,
 	} = useSearchStore();
-
-	const { theme, toggleTheme } = useThemeStore();
 
 	return (
 		<nav className="hidden lg:flex items-center gap-2 xl:gap-3 px-4 h-16 bg-bg-primary/91 backdrop-blur-[3px] border-b border-border sticky top-0 z-40">
@@ -96,15 +94,8 @@ export default function Navbar() {
 			{/* AI Search */}
 			<AiSearchBar />
 
-			{/* Theme toggle */}
-			<button
-				type="button"
-				onClick={toggleTheme}
-				aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-				className="p-2 text-text-primary hover:opacity-80 transition-colors cursor-pointer"
-			>
-				{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-			</button>
+			{/* App menu (theme toggle lives inside) */}
+			<AppMenu />
 		</nav>
 	);
 }

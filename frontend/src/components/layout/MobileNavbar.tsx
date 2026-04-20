@@ -1,7 +1,6 @@
 import {
 	Cpu,
 	Drum,
-	Moon,
 	MoonStar,
 	Search,
 	SlidersHorizontal,
@@ -12,12 +11,12 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchStore } from "../../store/searchStore";
-import { useThemeStore } from "../../store/themeStore";
 import AiSearchBar from "../search/AiSearchBar";
 import GenreDropdown from "../search/GenreDropdown";
 import MoodSlider from "../search/MoodSlider";
 import ResetFilters from "../search/ResetFilters";
 import VocalToggle from "../search/VocalToggle";
+import AppMenu from "./AppMenu";
 
 export default function MobileNavbar() {
 	const [filtersOpen, setFiltersOpen] = useState(false);
@@ -61,8 +60,6 @@ export default function MobileNavbar() {
 		setInstrumental,
 	} = useSearchStore();
 
-	const { theme, toggleTheme } = useThemeStore();
-
 	const activeFilterCount =
 		(mood !== null ? 1 : 0) +
 		(energy !== null ? 1 : 0) +
@@ -80,15 +77,6 @@ export default function MobileNavbar() {
 				</a>
 
 				<div className="flex items-center gap-1">
-					<button
-						type="button"
-						onClick={toggleTheme}
-						aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-						className="p-2 text-text-primary hover:opacity-80 transition-colors cursor-pointer"
-					>
-						{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
-					</button>
-
 					<button
 						type="button"
 						onClick={() => {
@@ -121,6 +109,8 @@ export default function MobileNavbar() {
 							</span>
 						)}
 					</button>
+
+					<AppMenu />
 				</div>
 			</div>
 

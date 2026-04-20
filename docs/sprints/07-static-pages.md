@@ -9,8 +9,8 @@
 - Privacy Policy (GDPR-aware: data collected, retention, deletion rights, contact)
 - Terms of Service
 - Help / FAQ (how mood vectors work, how to use sliders, AI search tips)
-- About page (project context, tech stack, link to portfolio)
-- Contact page with a simple form (name, email, message) — doubles as the GDPR deletion-request channel and the general "user wants to request something" inbox. Posts to a backend endpoint that emails the admin (reuses Sprint 8's transactional email provider, or use a free service like Formspree if Sprint 8 isn't ready yet)
+- About page (project context)
+- Contact page with a simple form (name, email, message) — doubles as the GDPR deletion-request channel and the general "user wants to request something" inbox. Posts to a backend endpoint that emails the admin.
 - Frontend routing (lazy-loaded; these are rarely visited). All pages render in-place as SPA routes — playback continues because the player iframe lives on `document.body` (overlay architecture)
 
 ### Navigation
