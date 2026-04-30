@@ -11,6 +11,9 @@ db-up:
 db-down:
 	docker compose -f docker-compose.dev.yml down
 
+db-restore-from-remote:
+	./restore-from-remote.sh
+
 test:
 	cd backend && ENV_FILE=.env.test uv run pytest --cov=app --cov-report=term-missing
 
