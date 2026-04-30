@@ -12,8 +12,11 @@ logger = logging.getLogger(__name__)
 
 YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
 
-# Matches timestamps like "0:00", "1:23:45" with optional prefixes (►, [, etc.) and suffixes (])
-CHAPTER_REGEX = re.compile(r"^[^\d]*(\d{1,2}):(\d{2})(?::(\d{2}))?[)\]]*\s+[-–—]?\s*(.+)")
+# Matches timestamps like "0:00", "1:23:45" with optional non-digit prefixes (►, [, etc.)
+# and an optional track-number prefix ("01. ", "1) ", "1: ") before the timestamp.
+CHAPTER_REGEX = re.compile(
+    r"^[^\d]*(?:\d+[.):]\s+)?(\d{1,2}):(\d{2})(?::(\d{2}))?[)\]]*\s+[-–—]?\s*(.+)"
+)
 
 
 def parse_duration_to_seconds(duration: str) -> int:

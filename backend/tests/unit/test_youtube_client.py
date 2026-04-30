@@ -145,6 +145,27 @@ class TestParseChapters:
         # ASSERT
         assert result is None
 
+    def test_track_number_prefix(self):
+        # ARRANGE — Seven Beats Music style: "01. 00:00 Artist - Title"
+        description = (
+            "01. 00:00 Nanobyte - Honour\n"
+            "02. 05:09 Andy Leech - Vanadis\n"
+            "03. 08:28 Eenspire - Created You\n"
+            "16. 01:00:28 Mauns - Met You"
+        )
+
+        # ACT
+        chapters = parse_chapters(description)
+
+        # ASSERT
+        assert chapters is not None
+        assert len(chapters) == 4
+        assert chapters[0].time == 0
+        assert chapters[0].title == "Nanobyte - Honour"
+        assert chapters[1].time == 309
+        assert chapters[3].time == 3628
+        assert chapters[3].title == "Mauns - Met You"
+
 
 # ---- _parse_video_item ----
 
