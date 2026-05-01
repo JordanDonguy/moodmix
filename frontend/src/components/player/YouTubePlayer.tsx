@@ -56,7 +56,7 @@ export default function YouTubePlayer() {
 		overlay.style.position = "fixed";
 		overlay.style.zIndex = "10";
 		overlay.style.overflow = "hidden";
-		overlay.style.borderRadius = "0.75rem";
+		overlay.className = "sm:rounded-xl";
 		overlay.style.display = "none";
 		document.body.appendChild(overlay);
 		overlayRef.current = overlay;
