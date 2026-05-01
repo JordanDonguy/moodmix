@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { ApiError } from "../../api/client";
+import { submitContact } from "../../api/contact";
 
 type FormState = {
 	name: string;
@@ -33,12 +35,15 @@ export default function ContactPage() {
 
 		setSubmitting(true);
 		try {
-			// TODO(sprint-7 PR 4): POST to /api/contact via Resend
-			await new Promise((r) => setTimeout(r, 400));
+			await submitContact(form);
 			setSent(true);
 			setForm(INITIAL);
-		} catch {
-			setError("Could not send your message. Please try again later.");
+		} catch (e) {
+			if (e instanceof ApiError && e.status === 429) {
+				setError("Too many messages from this IP. Try again later.");
+			} else {
+				setError("Could not send your message. Please try again later.");
+			}
 		} finally {
 			setSubmitting(false);
 		}
