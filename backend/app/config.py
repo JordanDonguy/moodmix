@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     LLM_API_URL: str = ""
     ADMIN_API_KEY: str = ""
+    RESEND_API_KEY: str = ""
+    RESEND_API_URL: str = "https://api.resend.com/emails"
+    CONTACT_FROM_EMAIL: str = ""
+    CONTACT_TO_EMAIL: str = ""
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173"
     ENV: str = "dev"
 
