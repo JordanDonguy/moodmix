@@ -15,7 +15,7 @@ export default function HomePage() {
 			</Suspense>
 			<QuickTags />
 
-			<main className="px-4 py-6 pb-24">
+			<main className="sm:px-4 py-6 pb-24">
 				<MixGrid />
 			</main>
 		</>
