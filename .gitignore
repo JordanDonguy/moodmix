@@ -13,6 +13,9 @@ backend/data/classified_batches_legacy/
 thumbnail*.png
 thumbnail*.jpg
 
+# Test coverage
+backend/.coverage
+
 # IDE
 .idea/
 .vscode/

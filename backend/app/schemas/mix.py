@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.genre import GenreResponse
 
@@ -54,8 +54,7 @@ class MixResponse(BaseModel):
     genres: list[GenreResponse]
     chapters: list[Chapter] | None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MixSearchResponse(BaseModel):
