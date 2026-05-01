@@ -8,12 +8,12 @@ export default function NowPlayingInfo({ compact = false }: { compact?: boolean 
 			`https://i.ytimg.com/vi/${currentMix.youtube_id}/hqdefault.jpg`)
 		: null;
 
-	const imageSize = compact ? "w-10 h-10" : "w-12 h-12";
+	const imageSize = compact ? "w-12" : "w-14";
 
 	return (
-		<div className="flex items-center gap-3 min-w-0 flex-1">
+		<div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
 			<div
-				className={`${imageSize} rounded overflow-hidden bg-bg-elevated shrink-0`}
+				className={`${imageSize} relative aspect-video rounded overflow-hidden bg-bg-elevated shrink-0`}
 			>
 				{thumbnail && (
 					<img

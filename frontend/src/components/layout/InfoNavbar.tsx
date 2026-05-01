@@ -4,7 +4,7 @@ import AppMenu from "./AppMenu";
 
 export default function InfoNavbar() {
 	return (
-		<nav className="flex items-center justify-between px-4 h-14 lg:h-16 bg-bg-primary/91 backdrop-blur-[3px] border-b border-border sticky top-0 z-40">
+		<nav className="flex items-center justify-between pl-2 sm:px-4 h-14 lg:h-16 bg-bg-primary/91 backdrop-blur-[3px] border-b border-border sticky top-0 z-40">
 			<Link
 				to="/"
 				className="flex items-center gap-2 text-lg font-semibold group"

@@ -29,8 +29,8 @@ export default function PlayerBar() {
 			</div>
 
 			{/* -- Mobile -- */}
-			<div className="sm:hidden px-3 py-2 space-y-1.5">
-				<div className="flex items-center gap-3">
+			<div className="sm:hidden px-1 py-2 space-y-1.5">
+				<div className="flex items-center gap-2">
 					<NowPlayingInfo compact />
 					<TransportControls />
 				</div>

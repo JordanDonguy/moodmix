@@ -70,13 +70,13 @@ export default function MobileNavbar() {
 	return (
 		<div ref={containerRef} className="lg:hidden sticky top-0 z-40">
 			{/* Top bar */}
-			<div className="flex items-center justify-between px-4 h-14 bg-bg-primary/91 backdrop-blur-[3px] border-b border-border">
+			<div className="flex items-center justify-between pl-2 h-14 bg-bg-primary/91 backdrop-blur-[3px] border-b border-border">
 				<a href="/#" className="text-lg font-semibold">
 					<span className="text-accent">Mood</span>
 					<span className="text-text-primary">Mix</span>
 				</a>
 
-				<div className="flex items-center gap-1">
+				<div className="flex items-center gap-2">
 					<button
 						type="button"
 						onClick={() => {
