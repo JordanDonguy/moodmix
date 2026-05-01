@@ -56,7 +56,7 @@ export default function YouTubePlayer() {
 		overlay.style.position = "fixed";
 		overlay.style.zIndex = "10";
 		overlay.style.overflow = "hidden";
-		overlay.style.borderRadius = "0.75rem";
+		overlay.className = "sm:rounded-xl";
 		overlay.style.display = "none";
 		document.body.appendChild(overlay);
 		overlayRef.current = overlay;
@@ -142,8 +142,9 @@ export default function YouTubePlayer() {
 		};
 	}, [startTracking, stopTracking]);
 
-	// Position overlay over the active card's thumbnail area (rAF loop
-	// so the overlay tracks grid reflows, not just scroll/resize)
+	// Position overlay over the active card's thumbnail area.
+	// Prefer CSS anchor positioning (compositor-driven, no scroll lag);
+	// fall back to a rAF loop for browsers that don't support it yet.
 	useEffect(() => {
 		const overlay = overlayRef.current;
 		if (!overlay) return;
@@ -151,6 +152,28 @@ export default function YouTubePlayer() {
 		if (!playerContainer) {
 			overlay.style.display = "none";
 			return;
+		}
+
+		const supportsAnchor =
+			typeof CSS !== "undefined" && CSS.supports?.("anchor-name", "--x");
+
+		if (supportsAnchor) {
+			playerContainer.style.setProperty("anchor-name", "--moodmix-player");
+			overlay.style.display = "block";
+			overlay.style.setProperty("position-anchor", "--moodmix-player");
+			overlay.style.top = "anchor(top)";
+			overlay.style.left = "anchor(left)";
+			overlay.style.width = "anchor-size(width)";
+			overlay.style.height = "anchor-size(height)";
+			return () => {
+				playerContainer.style.removeProperty("anchor-name");
+				overlay.style.removeProperty("position-anchor");
+				overlay.style.top = "";
+				overlay.style.left = "";
+				overlay.style.width = "";
+				overlay.style.height = "";
+				overlay.style.display = "none";
+			};
 		}
 
 		let rafId: number;

@@ -50,10 +50,10 @@ export default function ProgressBar() {
 	}, [sliderRef]);
 
 	return (
-		<div className="flex items-center gap-2 w-full">
+		<div className="flex items-center gap-2 w-full pr-1 sm:pr-0">
 			<span
 				ref={currentTimeRef}
-				className="text-[11px] text-text-muted tabular-nums w-8 text-right shrink-0"
+				className="text-[11px] text-text-muted tabular-nums max-w-8 text-right shrink-0"
 			>
 				-:--
 			</span>
@@ -79,7 +79,7 @@ export default function ProgressBar() {
 			</div>
 			<span
 				ref={durationRef}
-				className="text-[11px] text-text-muted tabular-nums w-8 shrink-0"
+				className="text-[11px] text-text-muted tabular-nums max-w-8 text-right shrink-0"
 			>
 				-:--
 			</span>

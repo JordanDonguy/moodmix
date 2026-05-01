@@ -12,7 +12,7 @@ The player system has three layers:
 
 YouTube iframes reload when their DOM node is moved (browser spec). In a React list with keys, grid reflows (search result changes, items added/removed) can reorder DOM nodes - even if the component instance is preserved. Embedding the iframe directly inside a MixCard would cause playback to restart every time the grid updates.
 
-**Solution:** The iframe lives in a `position: fixed` div appended to `document.body`. It never moves in the DOM. A `requestAnimationFrame` loop reads the active MixCard's `getBoundingClientRect()` every frame and positions the overlay on top of it.
+**Solution:** The iframe lives in a `position: fixed` div appended to `document.body`. It never moves in the DOM. The overlay tracks the active MixCard via **CSS anchor positioning** when supported (Chrome/Edge/Safari 26+) — `anchor-name` is set on the active card's thumbnail div, and the overlay's `top/left/width/height` resolve to `anchor()` / `anchor-size()` against it. Anchor positioning resolves on the compositor thread, so the overlay stays glued to the card during scroll with zero JS-driven lag. For browsers without anchor support (currently Firefox), a `requestAnimationFrame` loop reads the active MixCard's `getBoundingClientRect()` every frame and mirrors it onto the overlay's `top/left/width/height` as a fallback.
 
 ```
 document.body
@@ -34,8 +34,10 @@ document.body
 
 ### Positioning
 - `MixCard` sets `playerContainer` in the store when it becomes active (pointing to its thumbnail-area div)
-- `YouTubePlayer` runs a rAF loop that reads `playerContainer.getBoundingClientRect()` and mirrors it onto the overlay's `top/left/width/height`
-- When the card scrolls off-screen, the overlay hides; when it scrolls back, it reappears
+- `YouTubePlayer` feature-detects CSS anchor positioning via `CSS.supports("anchor-name", "--x")`:
+  - **Supported path:** sets `anchor-name: --moodmix-player` on the active container and `position-anchor` + `anchor()`/`anchor-size()` on the overlay. No JS runs during scroll. Effect cleanup removes the `anchor-name` from the previous container before the next one is bound.
+  - **Fallback path:** a `requestAnimationFrame` loop reads `getBoundingClientRect()` and writes pixel coordinates to the overlay each frame. The overlay is hidden via `display: none` when the card scrolls off-screen and re-shown when it scrolls back, sparing the GPU.
+- The anchored path keeps the overlay rendered even when the card is off-screen — the browser composites correctly without painting it, so an explicit visibility toggle isn't needed.
 
 ### Video loading
 - `currentMix` change → `loadVideoById()` (no player destruction/recreation)

@@ -86,9 +86,11 @@
 		&::-webkit-scrollbar { display: none; }
 	}
 
-	.card-hover:hover {
-		background-color: var(--card-hover-bg);
-		outline: 8px solid var(--card-hover-bg);
+	@media (hover: hover) {
+		.card-hover:hover {
+			background-color: var(--card-hover-bg);
+			outline: 8px solid var(--card-hover-bg);
+		}
 	}
 }
 

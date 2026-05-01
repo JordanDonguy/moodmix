@@ -78,7 +78,7 @@ export function MixCard({
 		<button
 			type="button"
 			onClick={handleClick}
-			className="group cursor-pointer flex flex-col h-full text-left rounded-xl outline-transparent duration-200 card-hover"
+			className="group cursor-pointer flex flex-col h-full text-left sm:rounded-xl outline-transparent duration-200 card-hover"
 			style={
 				{
 					"--card-color": `hsl(${hsl})`,
@@ -92,7 +92,7 @@ export function MixCard({
 				} as React.CSSProperties
 			}
 		>
-			<div className="relative aspect-video rounded-xl overflow-hidden bg-bg-secondary w-full">
+			<div className="relative aspect-video sm:rounded-xl overflow-hidden bg-bg-secondary w-full">
 				<img
 					src={thumbnail}
 					alt={mix.title}
@@ -109,7 +109,7 @@ export function MixCard({
 				</span>
 			</div>
 
-			<div className="mt-2 px-0.5 flex flex-col flex-1">
+			<div className="mt-2 px-1.5 sm:px-0.5 flex flex-col flex-1">
 				<h3 className="text-sm text-text-primary font-medium leading-snug line-clamp-2">
 					{mix.title}
 				</h3>
