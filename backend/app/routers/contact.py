@@ -1,26 +1,24 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, Request
 
 from app.routers.mixes import limiter
 from app.schemas.contact import ContactRequest, ContactResponse
 from app.services.contact_service import ContactService
+from app.services.email_client import EmailClient, get_email_client
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/contact", tags=["contact"])
 
 
-async def get_contact_service() -> AsyncGenerator[ContactService]:
-    """Factory for ContactService. Handles client lifecycle."""
-    service = ContactService()
-    try:
-        yield service
-    finally:
-        await service.close()
+def get_contact_service(
+    email_client: EmailClient = Depends(get_email_client),
+) -> ContactService:
+    """Factory for ContactService. The EmailClient lifecycle is owned by `get_email_client`."""
+    return ContactService(email_client=email_client)
 
 
 @router.post("", response_model=ContactResponse)

@@ -3,39 +3,35 @@ from __future__ import annotations
 import html
 import logging
 
-import httpx
-
 from app.config import settings
-from app.exceptions import AppException, ExternalAPIError
+from app.exceptions import AppException
+from app.services.email_client import EmailClient
 
 logger = logging.getLogger(__name__)
 
 
 class ContactConfigurationError(AppException):
-    """Raised when contact-related environment variables are missing."""
+    """Raised when contact-form addressing is not configured (from/to email)."""
 
     def __init__(self) -> None:
         super().__init__("Contact form is not configured", 503)
 
 
 class ContactService:
-    """Send contact-form messages via Resend.
+    """Build and dispatch contact-form emails.
 
-    HTTP client and config are injected so unit tests can swap in a MockTransport
-    and so the service has no hidden dependencies on global state.
+    Owns the contact-specific concerns (subject, body shaping, sender/recipient
+    addressing). The Resend transport itself lives in EmailClient — we don't
+    re-implement the network plumbing per feature.
     """
 
     def __init__(
         self,
-        client: httpx.AsyncClient | None = None,
-        api_key: str | None = None,
-        api_url: str | None = None,
+        email_client: EmailClient,
         from_email: str | None = None,
         to_email: str | None = None,
     ) -> None:
-        self._client = client or httpx.AsyncClient(timeout=10)
-        self._api_key = api_key if api_key is not None else settings.RESEND_API_KEY
-        self._api_url = api_url if api_url is not None else settings.RESEND_API_URL
+        self._email_client = email_client
         self._from_email = from_email if from_email is not None else settings.CONTACT_FROM_EMAIL
         self._to_email = to_email if to_email is not None else settings.CONTACT_TO_EMAIL
 
@@ -46,43 +42,18 @@ class ContactService:
         Pydantic schema. We additionally HTML-escape before composing the HTML body
         so any leftover special characters render as text, not markup.
         """
-        if not self._api_key or not self._from_email or not self._to_email:
-            logger.error("Contact form missing config (api_key/from/to email)")
+        if not self._from_email or not self._to_email:
+            logger.error("Contact form missing addressing config (from/to email)")
             raise ContactConfigurationError()
 
-        subject = f"[MoodMix contact] {name}"
-        text_body = self._build_text_body(name, email, message)
-        html_body = self._build_html_body(name, email, message)
-
-        payload: dict[str, object] = {
-            "from": self._from_email,
-            "to": [self._to_email],
-            "subject": subject,
-            "text": text_body,
-            "html": html_body,
-            "reply_to": email,
-        }
-
-        try:
-            response = await self._client.post(
-                self._api_url,
-                headers={
-                    "Authorization": f"Bearer {self._api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-        except httpx.HTTPError as e:
-            logger.error("Resend request failed: %s: %s", type(e).__name__, e)
-            raise ExternalAPIError("Resend", "request failed") from e
-
-        if response.status_code >= 400:
-            logger.error(
-                "Resend returned %d: %s", response.status_code, response.text[:200]
-            )
-            raise ExternalAPIError("Resend", f"status {response.status_code}")
-
-        logger.info("Contact email sent for %s", email)
+        await self._email_client.send(
+            from_addr=self._from_email,
+            to=self._to_email,
+            subject=f"[MoodMix contact] {name}",
+            text=self._build_text_body(name, email, message),
+            html=self._build_html_body(name, email, message),
+            reply_to=email,
+        )
 
     @staticmethod
     def _build_text_body(name: str, email: str, message: str) -> str:
@@ -101,6 +72,3 @@ class ContactService:
             f"<p><strong>From:</strong> {safe_name} &lt;{safe_email}&gt;</p>"
             f"<p>{safe_message}</p>"
         )
-
-    async def close(self) -> None:
-        await self._client.aclose()

@@ -1,49 +1,44 @@
 # pyright: reportPrivateUsage=false
 """Unit tests for ContactService.
 
-The HTTP client is injected via constructor and replaced with httpx.MockTransport
-so we test the real payload-building and error-handling logic without hitting Resend.
+The EmailClient is injected via constructor and replaced with an AsyncMock so
+we test the contact-specific logic (subject, body building, addressing) in
+isolation — Resend HTTP plumbing is covered separately in test_email_client.py.
 """
 
-import json
-from collections.abc import Callable
 from typing import cast
+from unittest.mock import AsyncMock
 
-import httpx
 import pytest
 
-from app.exceptions import ExternalAPIError
 from app.services.contact_service import ContactConfigurationError, ContactService
-
-ResendHandler = Callable[[httpx.Request], httpx.Response]
-
-
-def make_mock_client(handler: ResendHandler) -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+from app.services.email_client import EmailClient
 
 
-def make_service(handler: ResendHandler) -> ContactService:
-    return ContactService(
-        client=make_mock_client(handler),
-        api_key="test-key",
-        api_url="https://api.resend.com/emails",
-        from_email="noreply@moodmix.test",
-        to_email="inbox@moodmix.test",
+def make_service(
+    email_client: AsyncMock | None = None,
+    from_email: str = "noreply@moodmix.test",
+    to_email: str = "inbox@moodmix.test",
+) -> tuple[ContactService, AsyncMock]:
+    mock = email_client or AsyncMock(spec=EmailClient)
+    service = ContactService(
+        email_client=cast(EmailClient, mock),
+        from_email=from_email,
+        to_email=to_email,
     )
+    return service, mock
+
+
+def _send_kwargs(mock: AsyncMock) -> dict[str, str]:
+    """Return the kwargs of the single `email_client.send` call."""
+    mock.send.assert_awaited_once()
+    return cast(dict[str, str], mock.send.call_args.kwargs)
 
 
 class TestSendContactMessage:
-    async def test_posts_to_resend_with_expected_payload(self):
+    async def test_delegates_to_email_client_with_expected_addressing(self):
         # ARRANGE
-        captured: dict[str, object] = {}
-
-        def handler(request: httpx.Request) -> httpx.Response:
-            captured["url"] = str(request.url)
-            captured["auth"] = request.headers.get("authorization")
-            captured["body"] = json.loads(request.content)
-            return httpx.Response(200, json={"id": "abc123"})
-
-        service = make_service(handler)
+        service, mock = make_service()
 
         # ACT
         await service.send_contact_message(
@@ -53,27 +48,18 @@ class TestSendContactMessage:
         )
 
         # ASSERT
-        assert captured["url"] == "https://api.resend.com/emails"
-        assert captured["auth"] == "Bearer test-key"
-        body = captured["body"]
-        assert isinstance(body, dict)
-        assert body["from"] == "noreply@moodmix.test"
-        assert body["to"] == ["inbox@moodmix.test"]
-        assert body["reply_to"] == "user@example.com"
-        assert "user" in body["subject"]
-        assert "Hello" in body["text"]
-        assert "Hello" in body["html"]
+        kwargs = _send_kwargs(mock)
+        assert kwargs["from_addr"] == "noreply@moodmix.test"
+        assert kwargs["to"] == "inbox@moodmix.test"
+        assert kwargs["reply_to"] == "user@example.com"
+        assert kwargs["subject"] == "[MoodMix contact] user"
+        assert "Hello" in kwargs["text"]
+        assert "Hello" in kwargs["html"]
 
     async def test_html_body_escapes_special_chars(self):
         """The HTML body must escape <, >, & so leftover chars don't render as markup."""
         # ARRANGE
-        captured: dict[str, object] = {}
-
-        def handler(request: httpx.Request) -> httpx.Response:
-            captured["body"] = json.loads(request.content)
-            return httpx.Response(200, json={"id": "abc"})
-
-        service = make_service(handler)
+        service, mock = make_service()
 
         # ACT — note: schema would normally strip these, but service must be safe alone
         await service.send_contact_message(
@@ -83,22 +69,15 @@ class TestSendContactMessage:
         )
 
         # ASSERT
-        body = cast(dict[str, object], captured["body"])
-        html_body = body["html"]
-        assert isinstance(html_body, str)
+        kwargs = _send_kwargs(mock)
+        html_body = kwargs["html"]
         assert "<b>user</b>" not in html_body
         assert "&lt;b&gt;user&lt;/b&gt;" in html_body
         assert "A &amp; B &lt; C" in html_body
 
     async def test_html_body_converts_newlines_to_br(self):
         # ARRANGE
-        captured: dict[str, object] = {}
-
-        def handler(request: httpx.Request) -> httpx.Response:
-            captured["body"] = json.loads(request.content)
-            return httpx.Response(200, json={"id": "abc"})
-
-        service = make_service(handler)
+        service, mock = make_service()
 
         # ACT
         await service.send_contact_message(
@@ -108,71 +87,19 @@ class TestSendContactMessage:
         )
 
         # ASSERT
-        body = cast(dict[str, object], captured["body"])
-        html_body = body["html"]
-        assert isinstance(html_body, str)
-        assert "line one<br>line two" in html_body
+        kwargs = _send_kwargs(mock)
+        assert "line one<br>line two" in kwargs["html"]
 
-    async def test_raises_external_api_error_on_4xx(self):
+    async def test_external_errors_from_email_client_bubble_up(self):
+        """ContactService must not swallow ExternalAPIError raised by the transport."""
         # ARRANGE
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(422, json={"message": "bad payload"})
-
-        service = make_service(handler)
+        from app.exceptions import ExternalAPIError
+        mock = AsyncMock(spec=EmailClient)
+        mock.send.side_effect = ExternalAPIError("Resend", "boom")
+        service, _ = make_service(email_client=mock)
 
         # ACT & ASSERT
         with pytest.raises(ExternalAPIError):
-            await service.send_contact_message(
-                name="user",
-                email="user@example.com",
-                message="hi",
-            )
-
-    async def test_raises_external_api_error_on_5xx(self):
-        # ARRANGE
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(503, text="service unavailable")
-
-        service = make_service(handler)
-
-        # ACT & ASSERT
-        with pytest.raises(ExternalAPIError):
-            await service.send_contact_message(
-                name="user",
-                email="user@example.com",
-                message="hi",
-            )
-
-    async def test_raises_external_api_error_on_transport_failure(self):
-        # ARRANGE
-        def handler(request: httpx.Request) -> httpx.Response:
-            raise httpx.ConnectError("boom")
-
-        service = make_service(handler)
-
-        # ACT & ASSERT
-        with pytest.raises(ExternalAPIError):
-            await service.send_contact_message(
-                name="user",
-                email="user@example.com",
-                message="hi",
-            )
-
-    async def test_raises_configuration_error_when_api_key_missing(self):
-        # ARRANGE
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, json={"id": "abc"})
-
-        service = ContactService(
-            client=make_mock_client(handler),
-            api_key="",
-            api_url="https://api.resend.com/emails",
-            from_email="noreply@moodmix.test",
-            to_email="inbox@moodmix.test",
-        )
-
-        # ACT & ASSERT
-        with pytest.raises(ContactConfigurationError):
             await service.send_contact_message(
                 name="user",
                 email="user@example.com",
@@ -181,16 +108,7 @@ class TestSendContactMessage:
 
     async def test_raises_configuration_error_when_from_email_missing(self):
         # ARRANGE
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, json={"id": "abc"})
-
-        service = ContactService(
-            client=make_mock_client(handler),
-            api_key="test-key",
-            api_url="https://api.resend.com/emails",
-            from_email="",
-            to_email="inbox@moodmix.test",
-        )
+        service, mock = make_service(from_email="")
 
         # ACT & ASSERT
         with pytest.raises(ContactConfigurationError):
@@ -199,3 +117,17 @@ class TestSendContactMessage:
                 email="user@example.com",
                 message="hi",
             )
+        mock.send.assert_not_awaited()
+
+    async def test_raises_configuration_error_when_to_email_missing(self):
+        # ARRANGE
+        service, mock = make_service(to_email="")
+
+        # ACT & ASSERT
+        with pytest.raises(ContactConfigurationError):
+            await service.send_contact_message(
+                name="user",
+                email="user@example.com",
+                message="hi",
+            )
+        mock.send.assert_not_awaited()
