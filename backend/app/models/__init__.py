@@ -1,7 +1,19 @@
+from app.models.email_code import EmailCode
 from app.models.genre import Genre
 from app.models.mix import Mix
 from app.models.mix_genre import mix_genres
 from app.models.pipeline_run import PipelineRun
+from app.models.refresh_token import RefreshToken
 from app.models.seed_channel import SeedChannel
+from app.models.user import User
 
-__all__ = ["Genre", "Mix", "mix_genres", "PipelineRun", "SeedChannel"]
+__all__ = [
+    "EmailCode",
+    "Genre",
+    "Mix",
+    "mix_genres",
+    "PipelineRun",
+    "RefreshToken",
+    "SeedChannel",
+    "User",
+]
