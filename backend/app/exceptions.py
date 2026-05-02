@@ -38,3 +38,29 @@ class ExternalAPIError(AppException):
     def __init__(self, service: str = "", detail: str = ""):
         msg = f"External API error ({service}): {detail}" if service else "External API error"
         super().__init__(msg, 502)
+
+
+class InvalidCredentialsError(AppException):
+    """Raised for malformed/invalid tokens or unknown users."""
+
+    def __init__(self, detail: str = ""):
+        msg = f"Invalid credentials: {detail}" if detail else "Invalid credentials"
+        super().__init__(msg, 401)
+
+
+class TokenExpiredError(AppException):
+    """Raised when an access or refresh token has expired."""
+
+    def __init__(self) -> None:
+        super().__init__("Token expired", 401)
+
+
+class RefreshReuseError(AppException):
+    """Raised when a refresh token that has already been rotated is presented again.
+
+    Indicates a possibly stolen token. Callers should revoke the entire token
+    family in response.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("Refresh token reuse detected", 401)

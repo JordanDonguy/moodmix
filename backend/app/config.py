@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173"
     ENV: str = "dev"
 
+    # Auth — JWT access tokens + opaque refresh tokens (rotated)
+    JWT_SECRET: str = ""
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TTL_MINUTES: int = 15
+    REFRESH_TTL_DAYS: int = 30
+
     @cached_property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
