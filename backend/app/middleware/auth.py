@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import Depends, HTTPException
-from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import APIKeyCookie, APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -15,9 +15,9 @@ from app.services.user_service import UserService
 
 api_key_header = APIKeyHeader(name="X-API-Key")
 
-# auto_error=False: we want to raise our own 401 rather than FastAPI's default
-# so the JSON shape matches AppException.
-_bearer_scheme = HTTPBearer(auto_error=False)
+# auto_error=False so we can raise our own InvalidCredentialsError (matches
+# the AppException JSON shape) instead of FastAPI's default HTTPException.
+_access_cookie_scheme = APIKeyCookie(name=settings.ACCESS_COOKIE_NAME, auto_error=False)
 
 
 async def require_admin_key(api_key: str = Depends(api_key_header)) -> str:
@@ -32,20 +32,21 @@ def get_jwt_service() -> JwtService:
 
 
 async def get_current_user(
-    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    access_token: str | None = Depends(_access_cookie_scheme),
     db: AsyncSession = Depends(get_db),
     jwt_service: JwtService = Depends(get_jwt_service),
 ) -> User:
-    """Resolve the current user from a Bearer access token.
+    """Resolve the current user from the HttpOnly access cookie.
 
     Raises:
-        InvalidCredentialsError: missing/malformed token, or user no longer exists.
-        TokenExpiredError: token has expired (bubbles up from JwtService).
+        InvalidCredentialsError: cookie missing/malformed, or user no longer exists.
+        TokenExpiredError: token expired (bubbles up from JwtService) — frontend
+            should hit /api/auth/refresh and retry.
     """
-    if creds is None or creds.scheme.lower() != "bearer":
-        raise InvalidCredentialsError("missing bearer token")
+    if not access_token:
+        raise InvalidCredentialsError("missing access cookie")
 
-    claims = jwt_service.decode_access_token(creds.credentials)
+    claims = jwt_service.decode_access_token(access_token)
 
     try:
         user_id = UUID(claims.sub)
