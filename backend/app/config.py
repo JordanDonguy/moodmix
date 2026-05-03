@@ -23,6 +23,23 @@ class Settings(BaseSettings):
     ACCESS_TTL_MINUTES: int = 15
     REFRESH_TTL_DAYS: int = 30
 
+    # Branding for transactional emails
+    APP_NAME: str = "MoodMix"
+    APP_LOGO_URL: str = ""  # Publicly-reachable URL; leave empty to omit the logo.
+
+    # Email sign-in codes
+    AUTH_FROM_EMAIL: str = ""
+    EMAIL_CODE_TTL_MINUTES: int = 10
+    EMAIL_CODE_MAX_ATTEMPTS: int = 5
+
+    # Auth cookies — both access and refresh are HttpOnly. The access cookie is
+    # sent on every API request (path=/api); the refresh cookie is scoped to
+    # the auth router (path=/api/auth) so it never leaves that surface.
+    ACCESS_COOKIE_NAME: str = "moodmix_access"
+    REFRESH_COOKIE_NAME: str = "moodmix_refresh"
+    AUTH_COOKIE_SECURE: bool = True
+    AUTH_COOKIE_SAMESITE: str = "lax"
+
     @cached_property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
