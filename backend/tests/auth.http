@@ -1,0 +1,30 @@
+### MoodMix — Auth (passwordless email code)
+@base = http://localhost:8000
+@email = {{$dotenv CONTACT_TO_EMAIL}}
+
+
+# ─────────────────────────────────────────
+# Sign-in flow (visual test for the email)
+#
+# 1. Run "Request a sign-in code" — Resend delivers the email to {{email}}.
+# 2. Open the inbox and tweak the HTML/CSS in
+#    backend/app/services/auth_service.py (_build_html_body) until happy.
+# 3. Paste the 6-digit code into the verify-code request below and run it.
+# ─────────────────────────────────────────
+
+### Request a sign-in code (sends the email)
+POST {{base}}/api/auth/request-code
+Content-Type: application/json
+
+{
+  "email": "{{email}}"
+}
+
+### Verify the code (paste the 6 digits you received in `code`)
+POST {{base}}/api/auth/verify-code
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "code": ""
+}
