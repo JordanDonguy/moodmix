@@ -122,3 +122,8 @@
 	animation: menu-open 0.15s ease-out;
 	transform-origin: top left;
 }
+
+@utility animate-modal {
+	animation: menu-open 0.15s ease-out;
+	transform-origin: center;
+}
