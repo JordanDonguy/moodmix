@@ -1,6 +1,8 @@
-import { Moon, Sun, User } from "lucide-react";
+import { LogIn, LogOut, Moon, Sun, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "react-toastify";
+import { useAuthStore } from "../../store/authStore";
 import { useThemeStore } from "../../store/themeStore";
 
 type MenuItem = { to: string; label: string };
@@ -17,6 +19,9 @@ export default function AppMenu() {
 	const [open, setOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 	const { theme, toggleTheme } = useThemeStore();
+	const user = useAuthStore((s) => s.user);
+	const openLoginModal = useAuthStore((s) => s.openLoginModal);
+	const signOut = useAuthStore((s) => s.signOut);
 
 	useEffect(() => {
 		if (!open) return;
@@ -34,6 +39,17 @@ export default function AppMenu() {
 		};
 	}, [open]);
 
+	function handleSignIn() {
+		setOpen(false);
+		openLoginModal();
+	}
+
+	async function handleSignOut() {
+		setOpen(false);
+		await signOut();
+		toast.success("Signed out");
+	}
+
 	return (
 		<div ref={ref} className="relative">
 			<button
@@ -50,8 +66,33 @@ export default function AppMenu() {
 			{open && (
 				<div
 					role="menu"
-					className="absolute right-0 top-full mt-1 min-w-44 rounded-md border border-border bg-bg-primary/98 shadow-lg py-1 z-50 animate-menu-open-top-right"
+					className="absolute right-0 top-full mt-1 min-w-52 max-w-72 rounded-md border border-border bg-bg-primary/98 shadow-lg py-1 z-50 animate-menu-open-top-right"
 				>
+					{user ? (
+						<>
+							<div className="px-3 py-2 text-xs text-text-muted">
+								<p>Signed in as</p>
+								<p className="text-text-primary truncate" title={user.email}>
+									{user.email}
+								</p>
+							</div>
+							<div className="my-1 border-t border-border" />
+						</>
+					) : (
+						<>
+							<button
+								type="button"
+								role="menuitem"
+								onClick={handleSignIn}
+								className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+							>
+								<LogIn size={16} />
+								<span>Sign in</span>
+							</button>
+							<div className="my-1 border-t border-border" />
+						</>
+					)}
+
 					{ITEMS.map((item) => (
 						<Link
 							key={item.to}
@@ -75,6 +116,18 @@ export default function AppMenu() {
 						<span>{theme === "dark" ? "Light theme" : "Dark theme"}</span>
 						{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
 					</button>
+
+					{user && (
+						<button
+							type="button"
+							role="menuitem"
+							onClick={handleSignOut}
+							className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+						>
+							<LogOut size={16} />
+							<span>Sign out</span>
+						</button>
+					)}
 				</div>
 			)}
 		</div>
