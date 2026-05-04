@@ -119,3 +119,31 @@ tests/
 - **Config switching**: `ENV_FILE=.env.test` tells the app to load `.env.test` instead of `.env`, pointing at the test database with dummy API keys.
 - **Transaction rollback**: each test runs inside a database transaction that rolls back after the test. No test data persists - every test gets a clean slate.
 - **Dependency overrides**: route tests use FastAPI's `dependency_overrides` to inject the test DB session into the app, so requests go through the full stack but use the rolled-back transaction.
+
+## Dependencies
+
+### Auditing for vulnerabilities
+
+```bash
+# Backend (Python) — uses pip-audit via uvx, no project-level install needed
+make audit
+
+# Frontend (Node) — built into npm
+cd frontend && npm audit
+```
+
+Both commands query public advisory databases (PyPI / OSV for Python, npm advisories for Node) and exit non-zero when any package has a known CVE. Wire either into CI to fail builds on regressions.
+
+### Patching
+
+```bash
+# Backend — bump only the named packages, uv writes the lockfile automatically
+cd backend && uv lock --upgrade-package <name1> --upgrade-package <name2> && uv sync
+
+# Frontend — npm picks compatible patch/minor versions and rewrites the lockfile
+cd frontend && npm audit fix
+```
+
+For the backend, `uv lock --upgrade-package` respects the version constraints in `pyproject.toml` and bumps only the packages you name — safer than `uv lock --upgrade` which bumps the whole tree. Copy the package names from `make audit` output.
+
+For the frontend, `npm audit fix` is automatic; for major-version bumps you'd see a `--force` suggestion, which deserves a manual look.
