@@ -15,15 +15,19 @@ from unittest.mock import AsyncMock
 
 import httpx
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
 from app.config import settings
+from app.exceptions import InvalidCredentialsError
 from app.main import app
 from app.middleware.auth import get_jwt_service
-from app.routers.auth import get_auth_service
+from app.routers.auth import get_auth_service, get_google_oauth_service
 from app.routers.mixes import limiter
 from app.services.auth_service import AuthService
 from app.services.email_client import EmailClient
 from app.services.email_code_service import EmailCodeService
+from app.services.google_oauth_service import GoogleOAuthService
 from app.services.jwt_service import JwtService
 from app.services.refresh_token_service import RefreshTokenService
 from app.services.user_service import UserService
@@ -60,7 +64,7 @@ def email_client_mock() -> AsyncMock:
 
 
 @pytest.fixture(autouse=True)
-def _override_auth_deps(db, email_client_mock: AsyncMock) -> Generator[None]:  # pyright: ignore[reportUnusedFunction]
+def _override_auth_deps(db: AsyncSession, email_client_mock: AsyncMock) -> Generator[None]:  # pyright: ignore[reportUnusedFunction]
     """Wire the test DB session and a hard-coded JWT secret into both the
     `/auth/*` orchestrator and the `get_current_user` dependency used by
     `/auth/me`. Sharing one JwtService across both means tokens minted by
@@ -185,7 +189,6 @@ class TestRefresh:
     ):
         # ARRANGE
         signin = await _sign_in(client, email_client_mock)
-        old_access = signin.cookies[settings.ACCESS_COOKIE_NAME]
         old_refresh = signin.cookies[settings.REFRESH_COOKIE_NAME]
 
         # ACT
@@ -274,3 +277,93 @@ class TestMe:
         )
         response = await client.get("/api/auth/me")
         assert response.status_code == 401
+
+
+class TestGoogleLogin:
+    async def test_redirects_to_google_consent_via_oauth_service(
+        self, client: httpx.AsyncClient,
+    ):
+        """`GET /google` delegates to GoogleOAuthService.redirect_to_consent."""
+        # ARRANGE - return a stub redirect response from the oauth service
+        oauth_mock = AsyncMock(spec=GoogleOAuthService)
+        oauth_mock.redirect_to_consent.return_value = httpx.Response(
+            302, headers={"location": "https://accounts.google.com/o/oauth2/v2/auth?..."},
+        )
+        # The mock's return needs to be a real Starlette response for FastAPI;
+        # easier path: override get_google_oauth_service to return a stub that
+        # returns a RedirectResponse.
+        from starlette.responses import RedirectResponse
+
+        class StubOAuth:
+            async def redirect_to_consent(self, request: Request) -> RedirectResponse:
+                return RedirectResponse("https://accounts.google.com/oauth/auth?stub=1")
+
+            async def fetch_email(self, request: Request) -> str:
+                return "noop@example.com"
+
+        app.dependency_overrides[get_google_oauth_service] = lambda: StubOAuth()
+        try:
+            # ACT
+            response = await client.get("/api/auth/google", follow_redirects=False)
+        finally:
+            app.dependency_overrides.pop(get_google_oauth_service, None)
+
+        # ASSERT
+        assert response.status_code in (302, 307)
+        assert "accounts.google.com" in response.headers["location"]
+
+
+class TestGoogleCallback:
+    async def test_success_finalizes_session_and_redirects_to_frontend(
+        self,
+        client: httpx.AsyncClient,
+        email_client_mock: AsyncMock,  # noqa: ARG002 — fixture activates auth deps override
+    ):
+        # ARRANGE - oauth says this email was verified by Google
+        from starlette.responses import RedirectResponse
+
+        class SuccessOAuth:
+            async def redirect_to_consent(self, request: Request) -> RedirectResponse:
+                return RedirectResponse("https://google.test")
+
+            async def fetch_email(self, request: Request) -> str:
+                return "google-user@example.com"
+
+        app.dependency_overrides[get_google_oauth_service] = lambda: SuccessOAuth()
+        try:
+            # ACT
+            response = await client.get("/api/auth/google/callback", follow_redirects=False)
+        finally:
+            app.dependency_overrides.pop(get_google_oauth_service, None)
+
+        # ASSERT - redirected back to the frontend with a success marker
+        assert response.status_code in (302, 307)
+        assert response.headers["location"].startswith(settings.FRONTEND_URL)
+        assert "auth=signed_in" in response.headers["location"]
+        # And both session cookies are set
+        assert settings.ACCESS_COOKIE_NAME in response.cookies
+        assert settings.REFRESH_COOKIE_NAME in response.cookies
+
+    async def test_oauth_failure_redirects_to_frontend_with_error_marker(
+        self, client: httpx.AsyncClient,
+    ):
+        # ARRANGE
+        class FailingOAuth:
+            async def redirect_to_consent(self, request: Request) -> None:  # not used
+                pass
+
+            async def fetch_email(self, request: Request) -> str:
+                raise InvalidCredentialsError("state mismatch")
+
+        app.dependency_overrides[get_google_oauth_service] = lambda: FailingOAuth()
+        try:
+            # ACT
+            response = await client.get("/api/auth/google/callback", follow_redirects=False)
+        finally:
+            app.dependency_overrides.pop(get_google_oauth_service, None)
+
+        # ASSERT - we don't 401 the user — we redirect them home with a flag
+        assert response.status_code in (302, 307)
+        assert "auth=oauth_failed" in response.headers["location"]
+        # No session cookies on failure
+        assert settings.ACCESS_COOKIE_NAME not in response.cookies

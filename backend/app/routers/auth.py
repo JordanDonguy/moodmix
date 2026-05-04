@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Cookie, Depends, Request, Response, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -20,6 +21,7 @@ from app.schemas.auth import (
 from app.services.auth_service import AuthResult, AuthService
 from app.services.email_client import EmailClient, get_email_client
 from app.services.email_code_service import EmailCodeService
+from app.services.google_oauth_service import GoogleOAuthService
 from app.services.jwt_service import JwtService
 from app.services.refresh_token_service import RefreshTokenService
 from app.services.session_cookies import clear_session_cookies, set_session_cookies
@@ -48,6 +50,11 @@ def get_auth_service(
         jwt=jwt,
         refresh_tokens=RefreshTokenService(db),
     )
+
+
+def get_google_oauth_service() -> GoogleOAuthService:
+    """Factory for GoogleOAuthService. Stateless — fresh instance per request."""
+    return GoogleOAuthService()
 
 
 def _build_session_response(result: AuthResult) -> SessionResponse:
@@ -124,3 +131,53 @@ async def logout(
 async def me(user: User = Depends(get_current_user)) -> UserResponse:
     """Return the authenticated user's profile."""
     return UserResponse.model_validate(user)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Google OAuth
+#
+# Two endpoints implement the OAuth2 authorization-code flow:
+#   1. /google         — generate state, redirect user to Google's consent page
+#   2. /google/callback — verify state, exchange the code for an email,
+#                         finalize the session, redirect back to the frontend
+# State is stashed in the session cookie by authlib so the callback can
+# detect tampering / CSRF.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/google")
+async def google_login(
+    request: Request,
+    google: GoogleOAuthService = Depends(get_google_oauth_service),
+) -> RedirectResponse:
+    """Kick off the Google OAuth round-trip — redirects the user to Google."""
+    return await google.redirect_to_consent(request)
+
+
+@router.get("/google/callback")
+@limiter.limit("10/minute")  # type: ignore[misc]
+async def google_callback(
+    request: Request,  # required by slowapi for IP extraction
+    auth: AuthService = Depends(get_auth_service),
+    google: GoogleOAuthService = Depends(get_google_oauth_service),
+) -> RedirectResponse:
+    """Handle Google's callback: verify, finalize the session, return to the app.
+
+    On success or known failure modes (state mismatch, user denied consent),
+    we redirect back to the frontend with an `auth` query param so the SPA
+    can surface a toast — never crash the user on a blank backend page.
+    """
+    try:
+        email = await google.fetch_email(request)
+    except InvalidCredentialsError:
+        return RedirectResponse(f"{settings.FRONTEND_URL}/?auth=oauth_failed")
+
+    result = await auth.complete_google_signin(email)
+    response = RedirectResponse(f"{settings.FRONTEND_URL}/?auth=signed_in")
+    set_session_cookies(
+        response,
+        access_token=result.access_token,
+        refresh_token=result.refresh_token,
+        access_ttl_seconds=result.expires_in,
+    )
+    return response
