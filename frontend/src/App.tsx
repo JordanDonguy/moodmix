@@ -1,11 +1,16 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import HomePage from "./pages/HomePage";
+import { useAuthStore } from "./store/authStore";
 import { usePlayerStore } from "./store/playerStore";
+import { useThemeStore } from "./store/themeStore";
 
 const PlayerBar = lazy(() => import("./components/layout/PlayerBar"));
 const YouTubePlayer = lazy(() => import("./components/player/YouTubePlayer"));
+const LoginModal = lazy(() => import("./components/auth/LoginModal"));
 
 const InfoLayout = lazy(() => import("./pages/info/InfoLayout"));
 const AboutPage = lazy(() => import("./pages/info/AboutPage"));
@@ -19,6 +24,12 @@ function useDocumentTitle() {
 	useEffect(() => {
 		document.title = currentMix ? `${currentMix.title} — MoodMix` : "MoodMix";
 	}, [currentMix]);
+}
+
+function useHydrateAuth() {
+	useEffect(() => {
+		useAuthStore.getState().hydrate();
+	}, []);
 }
 
 function useSpacebarPlayPause() {
@@ -42,10 +53,22 @@ function useSpacebarPlayPause() {
 
 export default function App() {
 	useDocumentTitle();
+	useHydrateAuth();
 	useSpacebarPlayPause();
+	const theme = useThemeStore((s) => s.theme);
 
 	return (
 		<div className="min-h-screen bg-bg-primary">
+			<ToastContainer
+				position="bottom-center"
+				className="mb-14"
+				toastClassName="border border-text-secondary/40"
+				autoClose={3000}
+				newestOnTop
+				closeOnClick
+				pauseOnHover
+				theme={theme}
+			/>
 			<Routes>
 				<Route path="/" element={<HomePage />} />
 				<Route
@@ -69,6 +92,7 @@ export default function App() {
 			<Suspense>
 				<PlayerBar />
 				<YouTubePlayer />
+				<LoginModal />
 			</Suspense>
 		</div>
 	);
