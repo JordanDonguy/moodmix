@@ -114,6 +114,36 @@ class TestVerifyCode:
             await service.verify_code("user@example.com", "000000")
 
 
+class TestCompleteGoogleSignin:
+    async def test_creates_user_and_issues_session_on_first_signin(self, db: AsyncSession):
+        # ARRANGE
+        service, _ = _make_service(db)
+
+        # ACT
+        result = await service.complete_google_signin("oauth-new@example.com")
+
+        # ASSERT
+        assert result.user.email == "oauth-new@example.com"
+        assert result.user.last_login_at is not None
+        assert result.access_token
+        assert result.refresh_token
+
+    async def test_links_existing_user_by_email(self, db: AsyncSession):
+        """A user who first signed in via email-code should reuse the same
+        row when later signing in with Google for the same address."""
+        # ARRANGE
+        service, email = _make_service(db)
+        await service.request_code("dual@example.com")
+        code = email.send.call_args.kwargs["text"].split(": ")[1].split("\n")[0]
+        first = await service.verify_code("dual@example.com", code)
+
+        # ACT
+        google = await service.complete_google_signin("dual@example.com")
+
+        # ASSERT
+        assert google.user.id == first.user.id
+
+
 class TestRefresh:
     async def test_rotates_refresh_and_mints_new_access(self, db: AsyncSession):
         # ARRANGE

@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     AUTH_COOKIE_SECURE: bool = True
     AUTH_COOKIE_SAMESITE: str = "lax"
 
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = ""  # e.g. http://localhost:8000/api/auth/google/callback
+    # Where the backend redirects after a successful (or failed) OAuth callback.
+    FRONTEND_URL: str = "http://localhost:5173"
+
     @cached_property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]

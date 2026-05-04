@@ -98,11 +98,16 @@ class AuthService:
         → touch login → issue refresh) commits as a single transaction.
         """
         await self._codes.verify(email, code)
-        user = await self._users.get_or_create_by_email(email)
-        await self._users.touch_last_login(user)
-        result = await self._issue_session(user)
-        await self._db.commit()
-        return result
+        return await self._complete_signin(email)
+
+    async def complete_google_signin(self, email: str) -> AuthResult:
+        """Finalize a sign-in for an email already verified by Google OAuth.
+
+        The OAuth round-trip itself happens in `GoogleOAuthService`; by the
+        time we get here, the email has been confirmed by Google and we
+        treat it the same as a successful email-code verification.
+        """
+        return await self._complete_signin(email)
 
     async def refresh(self, raw_refresh: str) -> AuthResult:
         """Rotate a refresh token and mint a new access token."""
@@ -125,9 +130,18 @@ class AuthService:
         await self._refresh.revoke(raw_refresh)
         await self._db.commit()
 
-    async def _issue_session(self, user: User) -> AuthResult:
+    async def _complete_signin(self, email: str) -> AuthResult:
+        """Shared post-verification path used by both sign-in flows.
+
+        Both email-code verification and Google OAuth converge here once the
+        email has been confirmed: upsert the user, touch login time, mint
+        access + refresh tokens, commit. Single transaction either way.
+        """
+        user = await self._users.get_or_create_by_email(email)
+        await self._users.touch_last_login(user)
         access = self._jwt.create_access_token(user.id)
         refresh, _ = await self._refresh.issue(user.id)
+        await self._db.commit()
         return AuthResult(
             user=user,
             access_token=access,

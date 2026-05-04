@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+import { useOauthRedirectFeedback } from "./hooks/useOauthRedirectFeedback";
 import HomePage from "./pages/HomePage";
 import { useAuthStore } from "./store/authStore";
 import { usePlayerStore } from "./store/playerStore";
@@ -54,6 +55,7 @@ function useSpacebarPlayPause() {
 export default function App() {
 	useDocumentTitle();
 	useHydrateAuth();
+	useOauthRedirectFeedback();
 	useSpacebarPlayPause();
 	const theme = useThemeStore((s) => s.theme);
 
