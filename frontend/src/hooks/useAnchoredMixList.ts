@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { usePlayerStore } from "../store/playerStore";
 import type { Mix } from "../types/mix";
 
 /**
@@ -16,6 +17,9 @@ import type { Mix } from "../types/mix";
  * - Once set, the anchor persists across re-renders and pagination. It's
  *   cleared when the user starts prepending again, when the anchor falls out
  *   of the fetched results, or when the user plays the anchor itself.
+ * - When the player is in "State A" (resume hydrated but not played yet),
+ *   nothing is prepended — the saved mix is shown in the player bar but
+ *   the grid stays untouched until the user actually presses play.
  */
 export function useAnchoredMixList(
 	currentMix: Mix | null,
@@ -23,11 +27,13 @@ export function useAnchoredMixList(
 ): Mix[] {
 	const anchorRef = useRef<Mix | null>(null);
 	const wasPrependingRef = useRef(false);
+	const hydratedFromResume = usePlayerStore((s) => s.hydratedFromResume);
 
 	const isCurrentInFetched = currentMix
 		? fetchedMixes.some((m) => m.id === currentMix.id)
 		: false;
-	const shouldPrepend = !!currentMix && !isCurrentInFetched;
+	const shouldPrepend =
+		!!currentMix && !isCurrentInFetched && !hydratedFromResume;
 
 	// Capture the anchor on the prepending → not-prepending transition.
 	if (wasPrependingRef.current && !shouldPrepend && fetchedMixes.length > 0) {
