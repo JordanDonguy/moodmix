@@ -16,7 +16,7 @@ from app.admin import setup_admin
 from app.config import settings
 from app.database import engine
 from app.exceptions import AppException
-from app.routers import admin, auth, contact, genres, health, mixes
+from app.routers import admin, auth, contact, genres, health, mixes, playback
 from app.routers.mixes import limiter
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,7 @@ app.include_router(genres.router)
 app.include_router(mixes.router)
 app.include_router(contact.router)
 app.include_router(auth.router)
+app.include_router(playback.router)
 app.include_router(admin.router)
 
 # Admin panel
