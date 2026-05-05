@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+import { usePersistPlaybackProgress } from "./hooks/playback/usePersistPlaybackProgress";
+import { useResumePlaybackOnMount } from "./hooks/playback/useResumePlaybackOnMount";
 import { useOauthRedirectFeedback } from "./hooks/useOauthRedirectFeedback";
 import HomePage from "./pages/HomePage";
 import { useAuthStore } from "./store/authStore";
@@ -56,6 +58,8 @@ export default function App() {
 	useDocumentTitle();
 	useHydrateAuth();
 	useOauthRedirectFeedback();
+	useResumePlaybackOnMount();
+	usePersistPlaybackProgress();
 	useSpacebarPlayPause();
 	const theme = useThemeStore((s) => s.theme);
 

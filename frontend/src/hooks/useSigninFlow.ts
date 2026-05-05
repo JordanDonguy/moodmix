@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useState } from "react";
 import { requestCode, verifyCode } from "../api/auth";
 import { ApiError } from "../api/client";
+import { localPlaybackRepo } from "../lib/playback/localPlaybackRepo";
 import { useAuthStore } from "../store/authStore";
 
 export type SigninStep = "email" | "code";
@@ -57,6 +58,10 @@ export function useSigninFlow({ onSuccess }: UseSigninFlowOptions = {}) {
 		try {
 			const session = await verifyCode(email, submittedCode);
 			setUser(session.user);
+			// Drop any leftover anon playback pointer — from this moment on,
+			// Playback persistence will happen on the server, 
+			// and we don't want stale localStorage data.
+			localPlaybackRepo.clear();
 			onSuccess?.();
 		} catch (err) {
 			setError(messageFor(err));
