@@ -9,6 +9,18 @@ interface PlayerState {
 	currentTime: number;
 	duration: number;
 
+	/**
+	 * True when `currentMix` has been hydrated from the resume-playback
+	 * pointer but the user hasn't pressed play yet ("State A"). The iframe
+	 * stays idle, the mix card isn't prepended to the grid, and the
+	 * PlayerBar shows the saved progress as if the player were paused.
+	 *
+	 * Flips to false on any explicit play action — `playMix`, `next`, `prev`,
+	 * or `resume()` — at which point the iframe loads the video at the saved
+	 * seconds and the card is anchored normally ("State B").
+	 */
+	hydratedFromResume: boolean;
+
 	playMix: (mix: Mix, queue?: Mix[]) => void;
 	pause: () => void;
 	resume: () => void;
@@ -25,6 +37,14 @@ interface PlayerState {
 	toggleMute: () => void;
 	playerContainer: HTMLDivElement | null;
 	setPlayerContainer: (el: HTMLDivElement | null) => void;
+
+	/**
+	 * Hydrate the player from a saved resume pointer. Sets `currentMix`,
+	 * seeds `currentTime`, leaves `isPlaying` false, and flags
+	 * `hydratedFromResume` so the iframe-load and grid-anchoring effects
+	 * stay quiet until the user hits play.
+	 */
+	hydrateFromResume: (mix: Mix, secondsListened: number) => void;
 }
 
 export const usePlayerStore = create<PlayerState>()((set, get) => ({
@@ -34,6 +54,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 	isPlaying: false,
 	currentTime: 0,
 	duration: 0,
+	hydratedFromResume: false,
 
 	playMix: (mix, queue) => {
 		const q = queue ?? [mix];
@@ -45,11 +66,12 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 			isPlaying: true,
 			currentTime: 0,
 			duration: mix.duration_seconds,
+			hydratedFromResume: false,
 		});
 	},
 
 	pause: () => set({ isPlaying: false }),
-	resume: () => set({ isPlaying: true }),
+	resume: () => set({ isPlaying: true, hydratedFromResume: false }),
 
 	next: () => {
 		const { queue, queueIndex } = get();
@@ -62,6 +84,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 				isPlaying: true,
 				currentTime: 0,
 				duration: mix.duration_seconds,
+				hydratedFromResume: false,
 			});
 		}
 	},
@@ -77,6 +100,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 				isPlaying: true,
 				currentTime: 0,
 				duration: mix.duration_seconds,
+				hydratedFromResume: false,
 			});
 		}
 	},
@@ -133,4 +157,15 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 	toggleMute: () => set((s) => ({ muted: !s.muted })),
 	playerContainer: null,
 	setPlayerContainer: (el) => set({ playerContainer: el }),
+
+	hydrateFromResume: (mix, secondsListened) =>
+		set({
+			currentMix: mix,
+			queue: [mix],
+			queueIndex: 0,
+			isPlaying: false,
+			currentTime: secondsListened,
+			duration: mix.duration_seconds,
+			hydratedFromResume: true,
+		}),
 }));

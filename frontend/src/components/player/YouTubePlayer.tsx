@@ -29,6 +29,7 @@ export default function YouTubePlayer() {
 	const currentMix = usePlayerStore((s) => s.currentMix);
 	const isPlaying = usePlayerStore((s) => s.isPlaying);
 	const playerContainer = usePlayerStore((s) => s.playerContainer);
+	const hydratedFromResume = usePlayerStore((s) => s.hydratedFromResume);
 
 	const startTracking = useCallback(() => {
 		clearInterval(intervalRef.current);
@@ -93,8 +94,13 @@ export default function YouTubePlayer() {
 						event.target.setVolume(state.volume);
 						if (state.muted) event.target.mute();
 
-						const mix = usePlayerStore.getState().currentMix;
-						if (mix) {
+						const { currentMix: mix, hydratedFromResume: hydrated } =
+							usePlayerStore.getState();
+						// Skip the initial load when we're in State A (resume hydrated
+						// but not played yet) — the iframe stays idle until the user
+						// hits play, at which point the load-on-mix-change effect below
+						// kicks in.
+						if (mix && !hydrated) {
 							loadingRef.current = true;
 							event.target.loadVideoById(mix.youtube_id, state.currentTime);
 						}
@@ -195,12 +201,17 @@ export default function YouTubePlayer() {
 		return () => cancelAnimationFrame(rafId);
 	}, [playerContainer]);
 
-	// Load new video when currentMix changes
+	// Load new video when currentMix changes — or when the user transitions
+	// out of State A (resume hydrated → user pressed play). In the latter
+	// case `currentMix` may not have changed, but `hydratedFromResume` flips
+	// false, so we load the saved video at the saved seconds.
 	useEffect(() => {
 		if (!readyRef.current || !playerRef.current || !currentMix) return;
+		if (hydratedFromResume) return;
 		loadingRef.current = true;
-		playerRef.current.loadVideoById(currentMix.youtube_id);
-	}, [currentMix]);
+		const seekTo = usePlayerStore.getState().currentTime;
+		playerRef.current.loadVideoById(currentMix.youtube_id, seekTo);
+	}, [currentMix, hydratedFromResume]);
 
 	// Play/pause sync
 	useEffect(() => {
@@ -233,7 +244,8 @@ export default function YouTubePlayer() {
 			}
 		};
 		document.addEventListener("visibilitychange", handleVisibilityChange);
-		return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+		return () =>
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
 	}, []);
 
 	// OS media controls
@@ -303,7 +315,10 @@ export default function YouTubePlayer() {
 	// Seek
 	useEffect(() => {
 		const unsub = usePlayerStore.subscribe((state, prev) => {
-			if (state.pendingSeek !== null && state.pendingSeek !== prev.pendingSeek) {
+			if (
+				state.pendingSeek !== null &&
+				state.pendingSeek !== prev.pendingSeek
+			) {
 				playerRef.current?.seekTo(state.pendingSeek, true);
 				usePlayerStore.setState({ pendingSeek: null });
 			}

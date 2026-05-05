@@ -6,6 +6,7 @@ from app.models.pipeline_run import PipelineRun
 from app.models.refresh_token import RefreshToken
 from app.models.seed_channel import SeedChannel
 from app.models.user import User
+from app.models.user_playback_state import UserPlaybackState
 
 __all__ = [
     "EmailCode",
@@ -16,4 +17,5 @@ __all__ = [
     "RefreshToken",
     "SeedChannel",
     "User",
+    "UserPlaybackState",
 ]

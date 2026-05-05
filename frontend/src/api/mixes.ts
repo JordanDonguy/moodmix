@@ -1,4 +1,4 @@
-import type { AiSearchResponse, SearchResponse } from "../types/mix";
+import type { AiSearchResponse, Mix, SearchResponse } from "../types/mix";
 import { apiFetch } from "./client";
 
 export interface SearchParams {
@@ -26,6 +26,13 @@ export function searchMixes(params: SearchParams): Promise<SearchResponse> {
 	if (params.offset != null) query.set("offset", String(params.offset));
 
 	return apiFetch<SearchResponse>(`/api/mixes/search?${query}`);
+}
+
+/** Fetch a single mix by id. 404 if the mix doesn't exist or has been
+ * marked unavailable — used by resume-playback to validate the saved
+ * pointer before hydrating the player. */
+export function getMix(id: string): Promise<Mix> {
+	return apiFetch<Mix>(`/api/mixes/${id}`);
 }
 
 export function aiSearch(query: string): Promise<AiSearchResponse> {
