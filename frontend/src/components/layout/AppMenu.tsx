@@ -1,9 +1,12 @@
-import { LogIn, LogOut, Moon, Sun, User } from "lucide-react";
+import { Info, LogIn, LogOut, Moon, Sun, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuthStore } from "../../store/authStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { useThemeStore } from "../../store/themeStore";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
+import { Tooltip } from "../ui/Tooltip";
 
 type MenuItem = { to: string; label: string };
 
@@ -19,6 +22,8 @@ export default function AppMenu() {
 	const [open, setOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 	const { theme, toggleTheme } = useThemeStore();
+	const smartPlay = useSettingsStore((s) => s.smartPlay);
+	const toggleSmartPlay = useSettingsStore((s) => s.toggleSmartPlay);
 	const user = useAuthStore((s) => s.user);
 	const openLoginModal = useAuthStore((s) => s.openLoginModal);
 	const signOut = useAuthStore((s) => s.signOut);
@@ -106,6 +111,24 @@ export default function AppMenu() {
 					))}
 
 					<div className="my-1 border-t border-border" />
+
+					<button
+						type="button"
+						role="menuitemcheckbox"
+						aria-checked={smartPlay}
+						onClick={toggleSmartPlay}
+						className="flex w-full items-center justify-between px-3 py-2 text-sm text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+					>
+						<span className="flex items-center gap-1.5">
+							Smart play
+							<Tooltip content="When on, picks a mix with a similar feel after the current one. When off, simply plays the next mix in the list.">
+								<span className="text-text-muted hover:text-text-secondary transition-colors">
+									<Info size={14} />
+								</span>
+							</Tooltip>
+						</span>
+						<ToggleSwitch checked={smartPlay} />
+					</button>
 
 					<button
 						type="button"
