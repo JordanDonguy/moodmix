@@ -1,5 +1,7 @@
 import { create } from "zustand";
+import { computeNextMix } from "../lib/smartPlay/computeNextMix";
 import type { Mix } from "../types/mix";
+import { useSettingsStore } from "./settingsStore";
 
 interface PlayerState {
 	currentMix: Mix | null;
@@ -8,6 +10,22 @@ interface PlayerState {
 	isPlaying: boolean;
 	currentTime: number;
 	duration: number;
+
+	/**
+	 * Live pool of mixes loaded by the search grid — kept in sync by
+	 * `setAvailableMixes` so smart-play has access to whatever the user
+	 * has on screen, including infinite-scroll pages added after `playMix`
+	 * captured the initial queue.
+	 */
+	availableMixes: Mix[];
+
+	/**
+	 * Mix ids the user has played (or skipped past) in this session. Excluded
+	 * from smart-play candidates so the auto-advance never short-loops between
+	 * two similar mixes. Cleared on every manual `playMix` (a user-driven
+	 * play resets the implicit "auto-flow" starting from the new pick).
+	 */
+	playedMixIds: Set<string>;
 
 	/**
 	 * True when `currentMix` has been hydrated from the resume-playback
@@ -27,6 +45,7 @@ interface PlayerState {
 	next: () => void;
 	prev: () => void;
 	skipChapter: (dir: "next" | "prev") => void;
+	setAvailableMixes: (mixes: Mix[]) => void;
 	volume: number;
 	muted: boolean;
 	pendingSeek: number | null;
@@ -55,6 +74,8 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 	currentTime: 0,
 	duration: 0,
 	hydratedFromResume: false,
+	availableMixes: [],
+	playedMixIds: new Set(),
 
 	playMix: (mix, queue) => {
 		const q = queue ?? [mix];
@@ -67,6 +88,9 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 			currentTime: 0,
 			duration: mix.duration_seconds,
 			hydratedFromResume: false,
+			// Manual click = fresh start. The previous auto-play chain (if any)
+			// is over; smart-play should consider all loaded mixes again.
+			playedMixIds: new Set(),
 		});
 	},
 
@@ -74,19 +98,63 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 	resume: () => set({ isPlaying: true, hydratedFromResume: false }),
 
 	next: () => {
-		const { queue, queueIndex } = get();
-		const nextIdx = queueIndex + 1;
-		if (nextIdx < queue.length) {
-			const mix = queue[nextIdx];
+		const { currentMix, availableMixes, playedMixIds, queue, queueIndex } =
+			get();
+		if (!currentMix) return;
+
+		// Sequential mode: just advance the queue index. The user has
+		// explicitly opted out of smart-play and wants the predictable
+		// "next in line" behaviour.
+		if (!useSettingsStore.getState().smartPlay) {
+			const nextIdx = queueIndex + 1;
+			if (nextIdx < queue.length) {
+				const mix = queue[nextIdx];
+				set({
+					currentMix: mix,
+					queueIndex: nextIdx,
+					isPlaying: true,
+					currentTime: 0,
+					duration: mix.duration_seconds,
+					hydratedFromResume: false,
+				});
+			}
+			return;
+		}
+
+		// Smart-play: pick the closest match by genre overlap + mood-vector
+		// distance, excluding mixes the user has already heard this session.
+		let nextMix = computeNextMix(currentMix, availableMixes, playedMixIds);
+
+		// Pool exhausted (e.g. user hit `next` 15× in a row). Reset the
+		// played set and try once more so they don't get stuck. Repetition
+		// is preferable to silence — and the prefetch effect in MixGrid
+		// loads more pages whenever the unplayed pool runs low, so this
+		// fallback rarely fires in practice.
+		if (!nextMix) {
+			const fallbackPlayed = new Set<string>();
+			nextMix = computeNextMix(currentMix, availableMixes, fallbackPlayed);
+			if (!nextMix) return;
 			set({
-				currentMix: mix,
-				queueIndex: nextIdx,
+				currentMix: nextMix,
 				isPlaying: true,
 				currentTime: 0,
-				duration: mix.duration_seconds,
+				duration: nextMix.duration_seconds,
 				hydratedFromResume: false,
+				playedMixIds: new Set([currentMix.id]),
 			});
+			return;
 		}
+
+		const nextPlayed = new Set(playedMixIds);
+		nextPlayed.add(currentMix.id);
+		set({
+			currentMix: nextMix,
+			isPlaying: true,
+			currentTime: 0,
+			duration: nextMix.duration_seconds,
+			hydratedFromResume: false,
+			playedMixIds: nextPlayed,
+		});
 	},
 
 	prev: () => {
@@ -157,6 +225,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 	toggleMute: () => set((s) => ({ muted: !s.muted })),
 	playerContainer: null,
 	setPlayerContainer: (el) => set({ playerContainer: el }),
+	setAvailableMixes: (mixes) => set({ availableMixes: mixes }),
 
 	hydrateFromResume: (mix, secondsListened) =>
 		set({
