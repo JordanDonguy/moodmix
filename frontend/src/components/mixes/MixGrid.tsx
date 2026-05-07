@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { searchMixes } from "../../api/mixes";
 import { useAnchoredMixList } from "../../hooks/useAnchoredMixList";
 import { useDebounce } from "../../hooks/useDebounce";
@@ -40,25 +40,62 @@ export default function MixGrid() {
 		seed,
 	});
 
-	const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
-		useInfiniteQuery({
-			queryKey: ["mixes", debouncedParams],
-			queryFn: ({ pageParam = 0 }) =>
-				searchMixes({
-					...debouncedParams,
-					limit: PAGE_SIZE,
-					offset: pageParam,
-				}),
-			getNextPageParam: (lastPage, allPages) =>
-				lastPage.mixes.length === PAGE_SIZE
-					? allPages.length * PAGE_SIZE
-					: undefined,
-			initialPageParam: 0,
-		});
+	const {
+		data,
+		isLoading,
+		error,
+		fetchNextPage,
+		hasNextPage,
+		isFetchingNextPage,
+	} = useInfiniteQuery({
+		queryKey: ["mixes", debouncedParams],
+		queryFn: ({ pageParam = 0 }) =>
+			searchMixes({
+				...debouncedParams,
+				limit: PAGE_SIZE,
+				offset: pageParam,
+			}),
+		getNextPageParam: (lastPage, allPages) =>
+			lastPage.mixes.length === PAGE_SIZE
+				? allPages.length * PAGE_SIZE
+				: undefined,
+		initialPageParam: 0,
+	});
 
 	const currentMix = usePlayerStore((s) => s.currentMix);
-	const fetchedMixes = data?.pages.flatMap((p) => p.mixes) ?? [];
+	const setAvailableMixes = usePlayerStore((s) => s.setAvailableMixes);
+	const playedMixIds = usePlayerStore((s) => s.playedMixIds);
+	// Memoized so the reference is stable while `data` is unchanged — lets
+	// dependent hooks (anchor list, smart-play sync, prefetch) skip unneeded
+	// re-runs and keeps biome's exhaustive-deps rule happy.
+	const fetchedMixes = useMemo(
+		() => data?.pages.flatMap((p) => p.mixes) ?? [],
+		[data],
+	);
 	const allMixes = useAnchoredMixList(currentMix, fetchedMixes);
+
+	// Keep the player's smart-play candidate pool in sync with whatever's
+	// currently loaded in the grid, including pages added by infinite scroll.
+	useEffect(() => {
+		setAvailableMixes(fetchedMixes);
+	}, [fetchedMixes, setAvailableMixes]);
+
+	// Proactive prefetch: when smart-play has burned through most of the
+	// loaded pool, fetch another page in the background so `next()` keeps
+	// finding fresh candidates instead of hitting the reset-played fallback.
+	const LOW_POOL_THRESHOLD = 5;
+	useEffect(() => {
+		const unplayed = fetchedMixes.length - playedMixIds.size;
+		if (unplayed < LOW_POOL_THRESHOLD && hasNextPage && !isFetchingNextPage) {
+			fetchNextPage();
+		}
+	}, [
+		playedMixIds,
+		fetchedMixes,
+		hasNextPage,
+		isFetchingNextPage,
+		fetchNextPage,
+	]);
 
 	// Infinite scroll sentinel
 	const sentinelRef = useRef<HTMLDivElement>(null);
@@ -135,10 +172,7 @@ export default function MixGrid() {
 					{/* Sentinel + loading indicator */}
 					<div ref={sentinelRef} className="py-8 flex justify-center">
 						{isFetchingNextPage && (
-							<Loader2
-								size={24}
-								className="text-text-muted animate-spin"
-							/>
+							<Loader2 size={24} className="text-text-muted animate-spin" />
 						)}
 						{!hasNextPage && allMixes.length > PAGE_SIZE && (
 							<p className="text-text-muted text-sm">
