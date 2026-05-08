@@ -8,6 +8,7 @@ Idempotent: only touches mixes whose `chapters` column is null, non-array,
 or empty array.
 """
 
+import argparse
 import asyncio
 
 from sqlalchemy import select, text
@@ -17,17 +18,19 @@ from app.models.mix import Mix
 from app.services.youtube_client import YouTubeClient
 
 NO_CHAPTERS_FILTER = text(
-    "chapters IS NULL "
+    "(chapters IS NULL "
     "OR jsonb_typeof(chapters) != 'array' "
-    "OR jsonb_array_length(chapters) = 0"
+    "OR jsonb_array_length(chapters) = 0)"
 )
 
 
-async def backfill() -> None:
+async def backfill(channel_ids: list[str] | None = None) -> None:
     async with async_session() as db:
-        result = await db.execute(
-            select(Mix).where(NO_CHAPTERS_FILTER).order_by(Mix.channel_name)
-        )
+        query = select(Mix).where(NO_CHAPTERS_FILTER)
+        if channel_ids:
+            query = query.where(Mix.channel_id.in_(channel_ids))
+        query = query.order_by(Mix.channel_name)
+        result = await db.execute(query)
         mixes = list(result.scalars().all())
 
     print(f"Found {len(mixes)} mixes without chapters")
@@ -79,4 +82,11 @@ async def backfill() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(backfill())
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--channel-ids",
+        help="Comma-separated list of YouTube channel IDs to limit the backfill to",
+    )
+    args = parser.parse_args()
+    ids = [c.strip() for c in args.channel_ids.split(",")] if args.channel_ids else None
+    asyncio.run(backfill(channel_ids=ids))

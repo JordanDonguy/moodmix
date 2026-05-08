@@ -12,10 +12,23 @@ logger = logging.getLogger(__name__)
 
 YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
 
-# Matches timestamps like "0:00", "1:23:45" with optional non-digit prefixes (►, [, etc.)
-# and an optional track-number prefix ("01. ", "1) ", "1: ") before the timestamp.
-CHAPTER_REGEX = re.compile(
-    r"^[^\d]*(?:\d+[.):]\s+)?(\d{1,2}):(\d{2})(?::(\d{2}))?[)\]]*\s+[-–—]?\s*(.+)"
+# `[\s​ ]` — whitespace incl. zero-width space and non-breaking space
+# (some channels insert U+200B between timestamp and title).
+_WS = r"[\s​ ]"
+
+# Timestamp at start of line — the common case. Optional non-digit prefix (►, [, etc.)
+# and optional track number ("01. ", "1) ", "1: ", or just "01 ") before the timestamp.
+LEADING_TIMESTAMP_REGEX = re.compile(
+    rf"^[^\d]*(?:\d+[-.):]?{_WS}+)?"
+    rf"(?P<h_or_m>\d{{1,2}}):(?P<m_or_s>\d{{2}})(?::(?P<s>\d{{2}}))?[)\]]*"
+    rf"{_WS}+[-–—]?\s*(?P<title>.+)"
+)
+
+# Timestamp at end of line — e.g. "1. Karlberg - CONVERSATION 00:00:00".
+# Requires a track-number prefix to avoid matching prose with trailing numbers.
+TRAILING_TIMESTAMP_REGEX = re.compile(
+    rf"^\s*\d+[-.):]?{_WS}+(?P<title>.+?){_WS}+"
+    rf"(?P<h_or_m>\d{{1,2}}):(?P<m_or_s>\d{{2}})(?::(?P<s>\d{{2}}))?\s*$"
 )
 
 
@@ -37,21 +50,22 @@ def parse_chapters(description: str | None) -> list[Chapter] | None:
 
     chapters: list[Chapter] = []
     for line in description.splitlines():
-        match = CHAPTER_REGEX.match(line.strip())
-        if match:
-            hours_or_minutes = int(match.group(1))
-            minutes_or_seconds = int(match.group(2))
-            seconds_part = match.group(3)
-            title = match.group(4).strip()
+        stripped = line.strip()
+        match = LEADING_TIMESTAMP_REGEX.match(stripped) or TRAILING_TIMESTAMP_REGEX.match(stripped)
+        if not match:
+            continue
 
-            if seconds_part is not None:
-                # Format: H:MM:SS
-                time_seconds = hours_or_minutes * 3600 + minutes_or_seconds * 60 + int(seconds_part)
-            else:
-                # Format: M:SS
-                time_seconds = hours_or_minutes * 60 + minutes_or_seconds
+        h_or_m = int(match["h_or_m"])
+        m_or_s = int(match["m_or_s"])
+        seconds_part = match["s"]
+        title = match["title"].strip()
 
-            chapters.append(Chapter(time=time_seconds, title=title))
+        if seconds_part is not None:
+            time_seconds = h_or_m * 3600 + m_or_s * 60 + int(seconds_part)
+        else:
+            time_seconds = h_or_m * 60 + m_or_s
+
+        chapters.append(Chapter(time=time_seconds, title=title))
 
     return chapters if len(chapters) >= 3 else None
 
