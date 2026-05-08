@@ -15,6 +15,8 @@ from app.services.youtube_client import YouTubeClient
 async def crawl_all(
     max_videos_per_channel: int = 500,
     start_from: str | None = None,
+    only: str | None = None,
+    via_playlist: bool = False,
 ) -> None:
     youtube = YouTubeClient()
 
@@ -24,7 +26,9 @@ async def crawl_all(
             .where(SeedChannel.active.is_(True))
             .order_by(SeedChannel.channel_name)
         )
-        if start_from:
+        if only:
+            query = query.where(SeedChannel.channel_name == only)
+        elif start_from:
             query = query.where(SeedChannel.channel_name >= start_from)
         result = await db.execute(query)
         channels = result.scalars().all()
@@ -45,11 +49,17 @@ async def crawl_all(
             try:
                 async with async_session() as db:
                     crawler = CrawlerService(db, youtube_client=youtube)
-                    found, added = await crawler.crawl_channel(
-                        channel.channel_id,
-                        max_videos=max_videos_per_channel,
-                        skip_category_filter=channel.skip_category_filter,
-                    )
+                    if via_playlist:
+                        found, added = await crawler.crawl_channel_via_playlist(
+                            channel.channel_id,
+                            max_videos=10000,
+                        )
+                    else:
+                        found, added = await crawler.crawl_channel(
+                            channel.channel_id,
+                            max_videos=max_videos_per_channel,
+                            skip_category_filter=channel.skip_category_filter,
+                        )
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 403:
                     print(f"\n*** QUOTA EXHAUSTED after {crawled_channels} channels ***")
@@ -85,5 +95,10 @@ async def crawl_all(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-from", help="Skip channels alphabetically before this name")
+    parser.add_argument("--only", help="Crawl only this exact channel name")
+    parser.add_argument(
+        "--via-playlist", action="store_true",
+        help="Crawl via uploads playlist (bypasses search.list 500-result cap, no category filter)",
+    )
     args = parser.parse_args()
-    asyncio.run(crawl_all(start_from=args.start_from))
+    asyncio.run(crawl_all(start_from=args.start_from, only=args.only, via_playlist=args.via_playlist))
