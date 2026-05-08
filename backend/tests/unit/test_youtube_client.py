@@ -166,6 +166,82 @@ class TestParseChapters:
         assert chapters[3].time == 3628
         assert chapters[3].title == "Mauns - Met You"
 
+    def test_track_number_no_separator(self):
+        # ARRANGE — Jazzhop Records style: "01 00:00 Artist - Title" (no dot/paren)
+        description = (
+            "01 00:00 Hubert Tas - Flowers\n"
+            "02 02:54 .sinh - OneForNujabes\n"
+            "03 05:08 Levox - Shiki No Uta"
+        )
+
+        # ACT
+        chapters = parse_chapters(description)
+
+        # ASSERT
+        assert chapters is not None
+        assert len(chapters) == 3
+        assert chapters[0].time == 0
+        assert chapters[0].title == "Hubert Tas - Flowers"
+        assert chapters[1].time == 174
+        assert chapters[2].title == "Levox - Shiki No Uta"
+
+    def test_zero_width_chars_after_timestamp(self):
+        # ARRANGE — KushSessions style: zero-width spaces between timestamp and title
+        description = (
+            "00:00:00​​​ Vancouver Sleep Clinic - Yellow\n"
+            "00:04:16​​​ Echomatics - Serve Chilled\n"
+            "00:08:40​​​ Atmospherika x Ren Faye - Sakura"
+        )
+
+        # ACT
+        chapters = parse_chapters(description)
+
+        # ASSERT
+        assert chapters is not None
+        assert len(chapters) == 3
+        assert chapters[0].time == 0
+        assert chapters[0].title == "Vancouver Sleep Clinic - Yellow"
+        assert chapters[1].time == 256
+        assert chapters[2].title == "Atmospherika x Ren Faye - Sakura"
+
+    def test_trailing_timestamp(self):
+        # ARRANGE — INEXED style: "1. Artist - Title 00:00:00" (timestamp at end)
+        description = (
+            "1. Karlberg - CONVERSATION 00:00:00\n"
+            "2. m_a_ - Mirage 00:02:23\n"
+            "3. Baton - Ocean Night 00:05:11"
+        )
+
+        # ACT
+        chapters = parse_chapters(description)
+
+        # ASSERT
+        assert chapters is not None
+        assert len(chapters) == 3
+        assert chapters[0].time == 0
+        assert chapters[0].title == "Karlberg - CONVERSATION"
+        assert chapters[1].time == 143
+        assert chapters[2].title == "Baton - Ocean Night"
+
+    def test_dash_separator_trailing_timestamp(self):
+        # ARRANGE — A.L.I.S.O.N style: "1- Title 00:00:00" (dash separator)
+        description = (
+            "1-  µDust 00:00:00\n"
+            "2-  Alpha Orionis 00:04:30\n"
+            "3-  Halo 00:08:44"
+        )
+
+        # ACT
+        chapters = parse_chapters(description)
+
+        # ASSERT
+        assert chapters is not None
+        assert len(chapters) == 3
+        assert chapters[0].time == 0
+        assert chapters[0].title == "µDust"
+        assert chapters[1].time == 270
+        assert chapters[2].title == "Halo"
+
 
 # ---- _parse_video_item ----
 
