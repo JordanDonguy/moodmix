@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # Where the backend redirects after a successful (or failed) OAuth callback.
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Spotify (Client Credentials flow — app-level auth, no user login)
+    SPOTIFY_CLIENT_ID: str = ""
+    SPOTIFY_CLIENT_SECRET: str = ""
+
     @cached_property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
