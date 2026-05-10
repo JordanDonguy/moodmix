@@ -18,3 +18,12 @@ export function formatHoursMinutesSeconds(seconds: number): string {
 		return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 	return `${m}:${s.toString().padStart(2, "0")}`;
 }
+
+/*
+ * format a duration in milliseconds as M:SS (or H:MM:SS),
+ * with "—" for null / zero values
+ */
+export function formatDurationMs(ms: number | null): string {
+	if (!ms) return "—";
+	return formatHoursMinutesSeconds(Math.round(ms / 1000));
+}
