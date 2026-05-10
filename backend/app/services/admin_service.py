@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import logging
+import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import ChannelAlreadyExistsException
+from app.models.artist import Artist
 from app.models.pipeline_run import PipelineRun
 from app.models.seed_channel import SeedChannel
+from app.models.track import Track
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,55 @@ class AdminService:
         await self._db.commit()
         logger.info("Channel %s set active=%s", channel_id, active)
         return channel
+
+    async def list_artists(
+        self,
+        search: str = "",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[tuple[Artist, int]], int]:
+        """Return (artist, track_count) pairs for confirmed artists matching
+        the search, plus total count.
+        """
+        track_count_sq = (
+            select(Track.artist_id, func.count(Track.id).label("track_count"))
+            .group_by(Track.artist_id)
+            .subquery()
+        )
+        base = (
+            select(Artist, func.coalesce(track_count_sq.c.track_count, 0).label("track_count"))
+            .outerjoin(track_count_sq, Artist.id == track_count_sq.c.artist_id)
+            .where(Artist.resolution_tier == "confirmed")
+        )
+        if search:
+            base = base.where(Artist.name.ilike(f"%{search}%"))
+
+        count_result = await self._db.execute(
+            select(func.count()).select_from(base.subquery())
+        )
+        total: int = count_result.scalar_one()
+
+        rows = await self._db.execute(
+            base.order_by(Artist.name).limit(limit).offset(offset)
+        )
+        return [(row.Artist, row.track_count) for row in rows.all()], total
+
+    async def get_artist_tracks(
+        self, artist_id: uuid.UUID
+    ) -> tuple[Artist | None, list[Track]]:
+        artist_result = await self._db.execute(
+            select(Artist).where(Artist.id == artist_id)
+        )
+        artist = artist_result.scalar_one_or_none()
+        if artist is None:
+            return None, []
+
+        tracks_result = await self._db.execute(
+            select(Track)
+            .where(Track.artist_id == artist_id)
+            .order_by(Track.title)
+        )
+        return artist, list(tracks_result.scalars().all())
 
     async def get_pipeline_status(self, limit: int = 20) -> tuple[list[PipelineRun], int]:
         count_result = await self._db.execute(

@@ -5,10 +5,15 @@ patches settings.ADMIN_API_KEY to a known value so tests are self-contained
 regardless of what .env.test has set.
 """
 
+import uuid
+
 import httpx
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.models.artist import Artist
+from app.models.track import Track
 
 
 @pytest.fixture
@@ -116,6 +121,146 @@ class TestUpdateChannel:
             "/api/admin/channels/UC_DOES_NOT_EXIST",
             json={"active": False},
             headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 404
+
+
+class TestListArtistsRoute:
+    async def test_returns_only_confirmed_artists(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+    ):
+        # ARRANGE
+        db.add_all([
+            Artist(name="Bonobo", resolution_tier="confirmed"),
+            Artist(name="Mystery", resolution_tier="ambiguous"),
+        ])
+        await db.flush()
+
+        # ACT
+        response = await client.get("/api/admin/artists", headers=admin_headers)
+
+        # ASSERT
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert len(data["artists"]) == 1
+        assert data["artists"][0]["name"] == "Bonobo"
+
+    async def test_search_filter(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+    ):
+        # ARRANGE
+        db.add_all([
+            Artist(name="Bonobo", resolution_tier="confirmed"),
+            Artist(name="Tycho", resolution_tier="confirmed"),
+        ])
+        await db.flush()
+
+        # ACT
+        response = await client.get(
+            "/api/admin/artists?search=bono", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["artists"][0]["name"] == "Bonobo"
+
+    async def test_pagination_metadata(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+    ):
+        # ARRANGE
+        for i in range(3):
+            db.add(Artist(name=f"Artist{i}", resolution_tier="confirmed"))
+        await db.flush()
+
+        # ACT
+        response = await client.get(
+            "/api/admin/artists?limit=2&offset=1", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 3
+        assert data["limit"] == 2
+        assert data["offset"] == 1
+        assert len(data["artists"]) == 2
+
+    async def test_includes_track_count(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+    ):
+        # ARRANGE
+        artist = Artist(name="Bonobo", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        db.add_all([
+            Track(artist_id=artist.id, title="T1"),
+            Track(artist_id=artist.id, title="T2"),
+        ])
+        await db.flush()
+
+        # ACT
+        response = await client.get("/api/admin/artists", headers=admin_headers)
+
+        # ASSERT
+        assert response.status_code == 200
+        data = response.json()
+        assert data["artists"][0]["track_count"] == 2
+
+
+class TestGetArtistTracksRoute:
+    async def test_returns_artist_and_tracks(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+    ):
+        # ARRANGE
+        artist = Artist(name="Bonobo", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        db.add_all([
+            Track(artist_id=artist.id, title="Kong"),
+            Track(artist_id=artist.id, title="Apex"),
+        ])
+        await db.flush()
+
+        # ACT
+        response = await client.get(
+            f"/api/admin/artists/{artist.id}/tracks", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        data = response.json()
+        assert data["artist_name"] == "Bonobo"
+        assert data["total"] == 2
+        assert [t["title"] for t in data["tracks"]] == ["Apex", "Kong"]
+
+    async def test_unknown_artist_returns_404(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+    ):
+        # ACT
+        response = await client.get(
+            f"/api/admin/artists/{uuid.uuid4()}/tracks", headers=admin_headers,
         )
 
         # ASSERT

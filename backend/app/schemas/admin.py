@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -54,4 +54,45 @@ class PipelineRunResponse(BaseModel):
 
 class PipelineStatusResponse(BaseModel):
     runs: list[PipelineRunResponse]
+    total: int
+
+
+class ArtistListItem(BaseModel):
+    id: uuid.UUID
+    name: str
+    image_url: str | None
+    spotify_id: str | None
+    deezer_id: str | None
+    resolution_tier: str | None
+    genres: list[str] | None
+    track_count: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ArtistListResponse(BaseModel):
+    artists: list[ArtistListItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class TrackItem(BaseModel):
+    id: uuid.UUID
+    title: str
+    isrc: str | None
+    deezer_id: str | None
+    duration_ms: int | None
+    release_date: date | None
+    preview_url: str | None
+    status: str
+    raw_genres: list[str] | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ArtistTracksResponse(BaseModel):
+    artist_id: uuid.UUID
+    artist_name: str
+    tracks: list[TrackItem]
     total: int

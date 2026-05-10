@@ -1,6 +1,7 @@
 import logging
+import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -8,12 +9,16 @@ from app.exceptions import AppException
 from app.middleware.auth import require_admin_key
 from app.schemas.admin import (
     AddChannelRequest,
+    ArtistListItem,
+    ArtistListResponse,
+    ArtistTracksResponse,
     ChannelResponse,
     ChannelUpdateRequest,
     CrawlChannelRequest,
     CrawlResponse,
     PipelineRunResponse,
     PipelineStatusResponse,
+    TrackItem,
 )
 from app.services.admin_service import AdminService
 from app.services.crawler_service import CrawlerService
@@ -111,6 +116,52 @@ async def update_channel(
     if not channel:
         raise AppException(f"Channel not found: {channel_id}", 404)
     return ChannelResponse.model_validate(channel)
+
+
+@router.get("/artists", response_model=ArtistListResponse)
+async def list_artists(
+    search: str = Query(default=""),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+) -> ArtistListResponse:
+    """Search confirmed artists by name with track counts."""
+    service = AdminService(db)
+    pairs, total = await service.list_artists(
+        search=search, limit=limit, offset=offset
+    )
+    items = [
+        ArtistListItem(
+            id=artist.id,
+            name=artist.name,
+            image_url=artist.image_url,
+            spotify_id=artist.spotify_id,
+            deezer_id=artist.deezer_id,
+            resolution_tier=artist.resolution_tier,
+            genres=artist.genres,
+            track_count=count,
+        )
+        for artist, count in pairs
+    ]
+    return ArtistListResponse(artists=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/artists/{artist_id}/tracks", response_model=ArtistTracksResponse)
+async def get_artist_tracks(
+    artist_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> ArtistTracksResponse:
+    """Get all tracks for an artist."""
+    service = AdminService(db)
+    artist, tracks = await service.get_artist_tracks(artist_id)
+    if artist is None:
+        raise AppException(f"Artist not found: {artist_id}", 404)
+    return ArtistTracksResponse(
+        artist_id=artist.id,
+        artist_name=artist.name,
+        tracks=[TrackItem.model_validate(t) for t in tracks],
+        total=len(tracks),
+    )
 
 
 @router.get("/pipeline/status", response_model=PipelineStatusResponse)
