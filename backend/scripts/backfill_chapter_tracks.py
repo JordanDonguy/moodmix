@@ -28,7 +28,7 @@ from app.database import async_session
 from app.models.artist import Artist
 from app.models.track import Track
 from scripts._track_title import clean_track_title, normalize_track_title
-from scripts.resolve_artists import clean_name, normalize_for_match
+from scripts._artist_name import clean_name, normalize_for_match
 
 
 # Collab separators. All require surrounding whitespace (or a comma boundary)
