@@ -6,6 +6,8 @@ regardless of what .env.test has set.
 """
 
 import uuid
+from typing import Any
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -265,6 +267,157 @@ class TestGetArtistTracksRoute:
 
         # ASSERT
         assert response.status_code == 404
+
+
+class TestFreshPreviewRoute:
+    @staticmethod
+    def _patch_deezer(
+        monkeypatch: pytest.MonkeyPatch,
+        get_track_return: dict[str, Any] | None,
+    ) -> AsyncMock:
+        """Replace DeezerClient in the router with a mock returning the given track."""
+        mock = AsyncMock()
+        mock.get_track = AsyncMock(return_value=get_track_return)
+        mock.close = AsyncMock()
+        monkeypatch.setattr("app.routers.admin.DeezerClient", lambda: mock)
+        return mock
+
+    async def test_returns_fresh_url_and_persists_to_db(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        # ARRANGE
+        artist = Artist(name="Bonobo", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        track = Track(
+            artist_id=artist.id,
+            title="Kong",
+            deezer_id="12345",
+            preview_url="https://stale.url/track.mp3",
+        )
+        db.add(track)
+        await db.flush()
+
+        fresh_url = "https://fresh.cdn.dzcdn.net/stream/abc.mp3"
+        self._patch_deezer(monkeypatch, {"id": 12345, "preview": fresh_url})
+
+        # ACT
+        response = await client.get(
+            f"/api/admin/tracks/{track.id}/fresh-preview", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        data = response.json()
+        assert data["preview_url"] == fresh_url
+        # The route's commit() persisted the new URL onto the row
+        await db.refresh(track)
+        assert track.preview_url == fresh_url
+
+    async def test_no_change_when_url_already_fresh(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        # ARRANGE
+        artist = Artist(name="Bonobo", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        same_url = "https://same.cdn.dzcdn.net/stream/abc.mp3"
+        track = Track(
+            artist_id=artist.id,
+            title="Kong",
+            deezer_id="12345",
+            preview_url=same_url,
+        )
+        db.add(track)
+        await db.flush()
+        self._patch_deezer(monkeypatch, {"id": 12345, "preview": same_url})
+
+        # ACT
+        response = await client.get(
+            f"/api/admin/tracks/{track.id}/fresh-preview", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        assert response.json()["preview_url"] == same_url
+
+    async def test_track_with_no_deezer_id_returns_404(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+    ):
+        # ARRANGE
+        artist = Artist(name="Bonobo", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        track = Track(artist_id=artist.id, title="Kong")  # no deezer_id
+        db.add(track)
+        await db.flush()
+
+        # ACT
+        response = await client.get(
+            f"/api/admin/tracks/{track.id}/fresh-preview", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 404
+
+    async def test_unknown_track_returns_404(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+    ):
+        # ACT
+        response = await client.get(
+            f"/api/admin/tracks/{uuid.uuid4()}/fresh-preview", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 404
+
+    async def test_deezer_returns_none_passes_through(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """When Deezer has no record (get_track returns None), return null URL
+        and leave the cached value untouched."""
+        # ARRANGE
+        artist = Artist(name="Bonobo", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        track = Track(
+            artist_id=artist.id,
+            title="Kong",
+            deezer_id="12345",
+            preview_url="https://cached.url/track.mp3",
+        )
+        db.add(track)
+        await db.flush()
+        self._patch_deezer(monkeypatch, None)
+
+        # ACT
+        response = await client.get(
+            f"/api/admin/tracks/{track.id}/fresh-preview", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        assert response.json()["preview_url"] is None
+        # Cached URL should not be wiped
+        await db.refresh(track)
+        assert track.preview_url == "https://cached.url/track.mp3"
 
 
 class TestPipelineStatus:

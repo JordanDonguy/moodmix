@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.exceptions import AppException
 from app.middleware.auth import require_admin_key
+from app.models.track import Track
 from app.schemas.admin import (
     AddChannelRequest,
     ArtistListItem,
@@ -16,12 +17,14 @@ from app.schemas.admin import (
     ChannelUpdateRequest,
     CrawlChannelRequest,
     CrawlResponse,
+    FreshPreviewResponse,
     PipelineRunResponse,
     PipelineStatusResponse,
     TrackItem,
 )
 from app.services.admin_service import AdminService
 from app.services.crawler_service import CrawlerService
+from app.services.deezer_client import DeezerClient
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +147,35 @@ async def list_artists(
         for artist, count in pairs
     ]
     return ArtistListResponse(artists=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/tracks/{track_id}/fresh-preview", response_model=FreshPreviewResponse)
+async def get_fresh_preview(
+    track_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> FreshPreviewResponse:
+    """Fetch a fresh Deezer preview URL for a track.
+
+    Stored preview URLs are signed CDN links that expire (~24h). Calling this
+    endpoint pulls the current URL from Deezer and persists it back to the row
+    so subsequent reads from the catalog are also fresh.
+    """
+    track = await db.get(Track, track_id)
+    if track is None or not track.deezer_id:
+        raise AppException(f"Track has no Deezer ID: {track_id}", 404)
+
+    deezer = DeezerClient()
+    try:
+        dz_track = await deezer.get_track(track.deezer_id)
+    finally:
+        await deezer.close()
+
+    fresh_url = dz_track.get("preview") if dz_track else None
+    if fresh_url and fresh_url != track.preview_url:
+        track.preview_url = fresh_url
+        await db.commit()
+
+    return FreshPreviewResponse(track_id=track.id, preview_url=fresh_url)
 
 
 @router.get("/artists/{artist_id}/tracks", response_model=ArtistTracksResponse)

@@ -96,3 +96,8 @@ class ArtistTracksResponse(BaseModel):
     artist_name: str
     tracks: list[TrackItem]
     total: int
+
+
+class FreshPreviewResponse(BaseModel):
+    track_id: uuid.UUID
+    preview_url: str | None
