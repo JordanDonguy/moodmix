@@ -130,5 +130,15 @@ class DeezerClient:
                 return None
             raise
 
+    async def get_track(self, track_id: str | int) -> dict[str, Any] | None:
+        """Fetch a Deezer track. The ``preview`` field is a signed CDN URL
+        that expires (~24h) — fetch fresh whenever the cached URL fails."""
+        try:
+            return await self._get(f"/track/{track_id}")
+        except RuntimeError as e:
+            if "'code': 800" in str(e) or '"code": 800' in str(e):
+                return None
+            raise
+
     async def close(self) -> None:
         await self._client.aclose()

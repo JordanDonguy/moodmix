@@ -158,6 +158,47 @@ class TestGetAlbum:
         assert result is None
 
 
+# ---- get_track ----
+
+class TestGetTrack:
+    async def test_found_track_returned(self):
+        # ARRANGE
+        track: dict[str, Any] = {
+            "id": 12345,
+            "title": "Kong",
+            "preview": "https://cdnt-preview.dzcdn.net/stream/abc.mp3",
+        }
+
+        def handler(req: httpx.Request) -> httpx.Response:
+            return ok(track)
+
+        # ACT
+        result = await make_deezer_client(handler).get_track(12345)
+
+        # ASSERT
+        assert result == track
+
+    async def test_error_800_returns_none(self):
+        # ARRANGE
+        def handler(req: httpx.Request) -> httpx.Response:
+            return deezer_error(800, "no data")
+
+        # ACT
+        result = await make_deezer_client(handler).get_track(99999)
+
+        # ASSERT
+        assert result is None
+
+    async def test_other_error_raises(self):
+        # ARRANGE
+        def handler(req: httpx.Request) -> httpx.Response:
+            return deezer_error(100, "unexpected error")
+
+        # ACT / ASSERT
+        with pytest.raises(RuntimeError, match="Deezer API error"):
+            await make_deezer_client(handler).get_track(12345)
+
+
 # ---- retry behavior ----
 
 class TestRetryBehavior:
