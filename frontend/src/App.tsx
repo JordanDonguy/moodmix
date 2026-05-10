@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -14,6 +16,8 @@ import { useThemeStore } from "./store/themeStore";
 const PlayerBar = lazy(() => import("./components/layout/PlayerBar"));
 const YouTubePlayer = lazy(() => import("./components/player/YouTubePlayer"));
 const LoginModal = lazy(() => import("./components/auth/LoginModal"));
+
+const AdminPage = lazy(() => import("./pages/admin/AdminPage"));
 
 const InfoLayout = lazy(() => import("./pages/info/InfoLayout"));
 const AboutPage = lazy(() => import("./pages/info/AboutPage"));
@@ -62,6 +66,8 @@ export default function App() {
 	usePersistPlaybackProgress();
 	useSpacebarPlayPause();
 	const theme = useThemeStore((s) => s.theme);
+	const location = useLocation();
+	const isAdmin = location.pathname === "/admin";
 
 	return (
 		<div className="min-h-screen bg-bg-primary">
@@ -77,6 +83,14 @@ export default function App() {
 			/>
 			<Routes>
 				<Route path="/" element={<HomePage />} />
+				<Route
+					path="/admin"
+					element={
+						<Suspense>
+							<AdminPage />
+						</Suspense>
+					}
+				/>
 				<Route
 					path="/info"
 					element={
@@ -96,8 +110,8 @@ export default function App() {
 			</Routes>
 
 			<Suspense>
-				<PlayerBar />
-				<YouTubePlayer />
+				{!isAdmin && <PlayerBar />}
+				{!isAdmin && <YouTubePlayer />}
 				<LoginModal />
 			</Suspense>
 		</div>
