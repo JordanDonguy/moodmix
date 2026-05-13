@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from typing import TYPE_CHECKING, Any
 
 from sqladmin import Admin, ModelView, action
@@ -68,7 +69,8 @@ class MixAdmin(ModelView, model=Mix):
     column_details_exclude_list = [Mix.mood_vector]
     @staticmethod
     def _youtube_link(m: Mix, _: str) -> str:
-        return f'<a href="https://youtube.com/watch?v={m.youtube_id}" target="_blank">{m.youtube_id}</a>'
+        yt_id = html.escape(m.youtube_id)
+        return f'<a href="https://youtube.com/watch?v={yt_id}" target="_blank">{yt_id}</a>'
 
     column_formatters = {"youtube_id": _youtube_link}  # type: ignore[assignment]
     column_formatters_detail = {"youtube_id": _youtube_link}  # type: ignore[assignment]
@@ -152,8 +154,9 @@ class ArtistAdmin(ModelView, model=Artist):
     def _image_thumb(a: Artist, _: str) -> str:
         if not a.image_url:
             return ""
+        src = html.escape(a.image_url)
         return (
-            f'<img src="{a.image_url}" alt="" '
+            f'<img src="{src}" alt="" '
             f'style="height:40px;width:40px;border-radius:50%;object-fit:cover;" />'
         )
 
@@ -161,18 +164,20 @@ class ArtistAdmin(ModelView, model=Artist):
     def _spotify_link(a: Artist, _: str) -> str:
         if not a.spotify_id:
             return ""
+        sp_id = html.escape(a.spotify_id)
         return (
-            f'<a href="https://open.spotify.com/artist/{a.spotify_id}" '
-            f'target="_blank">{a.spotify_id}</a>'
+            f'<a href="https://open.spotify.com/artist/{sp_id}" '
+            f'target="_blank">{sp_id}</a>'
         )
 
     @staticmethod
     def _deezer_link(a: Artist, _: str) -> str:
         if not a.deezer_id:
             return ""
+        dz_id = html.escape(a.deezer_id)
         return (
-            f'<a href="https://www.deezer.com/artist/{a.deezer_id}" '
-            f'target="_blank">{a.deezer_id}</a>'
+            f'<a href="https://www.deezer.com/artist/{dz_id}" '
+            f'target="_blank">{dz_id}</a>'
         )
 
     # List view stays raw so values are copy-paste friendly.
@@ -210,26 +215,30 @@ class TrackAdmin(ModelView, model=Track):
     def _artist_link(t: Track, _: str) -> str:
         if not t.artist:
             return ""
+        artist_id = html.escape(str(t.artist.id))
+        artist_name = html.escape(t.artist.name)
         return (
-            f'<a href="/admin/artist/details/{t.artist.id}">{t.artist.name}</a>'
+            f'<a href="/admin/artist/details/{artist_id}">{artist_name}</a>'
         )
 
     @staticmethod
     def _deezer_track_link(t: Track, _: str) -> str:
         if not t.deezer_id:
             return ""
+        dz_id = html.escape(t.deezer_id)
         return (
-            f'<a href="https://www.deezer.com/track/{t.deezer_id}" '
-            f'target="_blank">{t.deezer_id}</a>'
+            f'<a href="https://www.deezer.com/track/{dz_id}" '
+            f'target="_blank">{dz_id}</a>'
         )
 
     @staticmethod
     def _deezer_album_link(t: Track, _: str) -> str:
         if not t.deezer_album_id:
             return ""
+        dz_album_id = html.escape(t.deezer_album_id)
         return (
-            f'<a href="https://www.deezer.com/album/{t.deezer_album_id}" '
-            f'target="_blank">{t.deezer_album_id}</a>'
+            f'<a href="https://www.deezer.com/album/{dz_album_id}" '
+            f'target="_blank">{dz_album_id}</a>'
         )
 
     @staticmethod
@@ -243,9 +252,10 @@ class TrackAdmin(ModelView, model=Track):
     def _preview_audio(t: Track, _: str) -> str:
         if not t.preview_url:
             return ""
+        src = html.escape(t.preview_url)
         return (
             f'<audio controls preload="none" style="height:30px;width:200px;">'
-            f'<source src="{t.preview_url}" type="audio/mpeg"></audio>'
+            f'<source src="{src}" type="audio/mpeg"></audio>'
         )
 
     # List view stays raw so values are copy-paste friendly. Duration is a
