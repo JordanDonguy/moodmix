@@ -14,12 +14,12 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import InvalidCredentialsError, RefreshReuseError
-from app.services.auth_service import AuthConfigurationError, AuthService
-from app.services.email_client import EmailClient
-from app.services.email_code_service import EmailCodeService
-from app.services.jwt_service import JwtService
-from app.services.refresh_token_service import RefreshTokenService
-from app.services.user_service import UserService
+from app.services.auth.auth_service import AuthConfigurationError, AuthService
+from app.services.email.email_client import EmailClient
+from app.services.auth.email_code_service import EmailCodeService
+from app.services.auth.jwt_service import JwtService
+from app.services.auth.refresh_token_service import RefreshTokenService
+from app.services.auth.user_service import UserService
 
 _TEST_SECRET = "test-secret-at-least-32-bytes-long-for-hs256-x"
 

@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.services.contact_service import ContactConfigurationError, ContactService
-from app.services.email_client import EmailClient
+from app.services.email.email_client import EmailClient
 
 
 def make_service(

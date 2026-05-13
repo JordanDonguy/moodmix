@@ -25,7 +25,7 @@ from app.schemas.admin import (
 )
 from app.services.admin_service import AdminService
 from app.services.crawler_service import CrawlerService
-from app.services.deezer_client import DeezerClient
+from app.services.clients.deezer_client import DeezerClient
 
 logger = logging.getLogger(__name__)
 

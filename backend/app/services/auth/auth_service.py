@@ -8,17 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.exceptions import AppException, InvalidCredentialsError
 from app.models.user import User
-from app.services.email_client import EmailClient
-from app.services.email_code_service import EmailCodeService
-from app.services.email_templates import (
+from app.services.email.email_client import EmailClient
+from app.services.auth.email_code_service import EmailCodeService
+from app.services.email.email_templates import (
     format_sender,
     signin_code_html_body,
     signin_code_subject,
     signin_code_text_body,
 )
-from app.services.jwt_service import JwtService
-from app.services.refresh_token_service import RefreshTokenService
-from app.services.user_service import UserService
+from app.services.auth.jwt_service import JwtService
+from app.services.auth.refresh_token_service import RefreshTokenService
+from app.services.auth.user_service import UserService
 
 logger = logging.getLogger(__name__)
 

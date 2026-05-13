@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from app.services.spotify_client import SpotifyClient
+from app.services.clients.spotify_client import SpotifyClient
 
 SpotifyHandler = Callable[[httpx.Request], httpx.Response]
 

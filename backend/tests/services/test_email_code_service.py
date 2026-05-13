@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import InvalidCredentialsError
 from app.models.email_code import EmailCode
-from app.services.email_code_service import EmailCodeService
+from app.services.auth.email_code_service import EmailCodeService
 
 
 def _make_service(db: AsyncSession, max_attempts: int = 5) -> EmailCodeService:

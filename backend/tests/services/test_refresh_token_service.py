@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import InvalidCredentialsError, RefreshReuseError, TokenExpiredError
 from app.models.refresh_token import RefreshToken
-from app.services.refresh_token_service import RefreshTokenService
-from app.services.user_service import UserService
+from app.services.auth.refresh_token_service import RefreshTokenService
+from app.services.auth.user_service import UserService
 
 
 async def _make_user(db: AsyncSession, email: str = "refresh@example.com"):

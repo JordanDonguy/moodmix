@@ -9,7 +9,7 @@ from app.models.mix import Mix
 from app.models.seed_channel import SeedChannel
 from app.models.skipped_video import SkippedVideo
 from app.schemas.mix import MixMetadata
-from app.services.youtube_client import YouTubeClient
+from app.services.clients.youtube_client import YouTubeClient
 
 logger = logging.getLogger(__name__)
 

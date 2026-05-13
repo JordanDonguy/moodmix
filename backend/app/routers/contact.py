@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from app.routers.mixes import limiter
 from app.schemas.contact import ContactRequest, ContactResponse
 from app.services.contact_service import ContactService
-from app.services.email_client import EmailClient, get_email_client
+from app.services.email.email_client import EmailClient, get_email_client
 
 logger = logging.getLogger(__name__)
 

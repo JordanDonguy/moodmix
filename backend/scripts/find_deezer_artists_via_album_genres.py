@@ -37,7 +37,7 @@ from sqlalchemy import select
 
 from app.database import async_session
 from app.models.artist import Artist
-from app.services.deezer_client import DeezerClient
+from app.services.clients.deezer_client import DeezerClient
 from scripts._artist_name import SPOTIFY_ALLOW_PATTERNS, normalize_for_match
 
 OUTPUT_FILE = Path(__file__).parent.parent / "data" / "deezer_artist_candidates.json"
