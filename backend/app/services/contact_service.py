@@ -5,7 +5,7 @@ import logging
 
 from app.config import settings
 from app.exceptions import AppException
-from app.services.email_client import EmailClient
+from app.services.email.email_client import EmailClient
 
 logger = logging.getLogger(__name__)
 

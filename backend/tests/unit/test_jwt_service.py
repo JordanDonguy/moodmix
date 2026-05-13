@@ -11,7 +11,7 @@ import jwt
 import pytest
 
 from app.exceptions import InvalidCredentialsError, TokenExpiredError
-from app.services.jwt_service import JwtService
+from app.services.auth.jwt_service import JwtService
 
 
 _TEST_SECRET = "test-secret-at-least-32-bytes-long-for-hs256-x"

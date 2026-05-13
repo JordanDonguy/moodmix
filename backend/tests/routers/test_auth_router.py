@@ -24,13 +24,13 @@ from app.main import app
 from app.middleware.auth import get_jwt_service
 from app.routers.auth import get_auth_service, get_google_oauth_service
 from app.routers.mixes import limiter
-from app.services.auth_service import AuthService
-from app.services.email_client import EmailClient
-from app.services.email_code_service import EmailCodeService
-from app.services.google_oauth_service import GoogleOAuthService
-from app.services.jwt_service import JwtService
-from app.services.refresh_token_service import RefreshTokenService
-from app.services.user_service import UserService
+from app.services.auth.auth_service import AuthService
+from app.services.email.email_client import EmailClient
+from app.services.auth.email_code_service import EmailCodeService
+from app.services.auth.google_oauth_service import GoogleOAuthService
+from app.services.auth.jwt_service import JwtService
+from app.services.auth.refresh_token_service import RefreshTokenService
+from app.services.auth.user_service import UserService
 
 _TEST_SECRET = "test-secret-at-least-32-bytes-long-for-hs256-x"
 

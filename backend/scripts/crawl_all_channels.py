@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.database import async_session
 from app.models.seed_channel import SeedChannel
 from app.services.crawler_service import CrawlerService
-from app.services.youtube_client import YouTubeClient
+from app.services.clients.youtube_client import YouTubeClient
 
 
 async def crawl_all(

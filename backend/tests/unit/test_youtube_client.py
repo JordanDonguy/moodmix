@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 
-from app.services.youtube_client import YouTubeClient, parse_chapters, parse_duration_to_seconds
+from app.services.clients.youtube_client import YouTubeClient, parse_chapters, parse_duration_to_seconds
 
 # A description with 3 timestamped chapters — enough to satisfy parse_chapters
 # and prevent get_video_details from falling back to get_chapters_from_comments.

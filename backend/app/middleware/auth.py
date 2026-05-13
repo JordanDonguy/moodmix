@@ -10,8 +10,8 @@ from app.config import settings
 from app.database import get_db
 from app.exceptions import InvalidCredentialsError
 from app.models.user import User
-from app.services.jwt_service import JwtService
-from app.services.user_service import UserService
+from app.services.auth.jwt_service import JwtService
+from app.services.auth.user_service import UserService
 
 api_key_header = APIKeyHeader(name="X-API-Key")
 

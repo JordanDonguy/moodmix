@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.user_service import UserService
+from app.services.auth.user_service import UserService
 
 
 class TestGetOrCreateByEmail:

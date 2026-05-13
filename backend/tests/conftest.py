@@ -23,7 +23,7 @@ from app.database import get_db
 from app.main import app
 from app.models.genre import Genre
 from app.models.mix import Mix
-from app.services.youtube_client import YouTubeClient
+from app.services.clients.youtube_client import YouTubeClient
 
 
 @pytest.fixture(scope="session")

@@ -17,7 +17,7 @@ from app.main import app
 from app.middleware.auth import get_current_user
 from app.models.mix import Mix
 from app.models.user import User
-from app.services.user_service import UserService
+from app.services.auth.user_service import UserService
 
 
 @pytest.fixture

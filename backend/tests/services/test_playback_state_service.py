@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user_playback_state import UserPlaybackState
 from app.services.playback_state_service import PlaybackStateService
-from app.services.user_service import UserService
+from app.services.auth.user_service import UserService
 
 
 async def _make_user(db: AsyncSession, email: str = "playback@example.com"):

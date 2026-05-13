@@ -14,7 +14,7 @@ import httpx
 import pytest
 
 from app.exceptions import ExternalAPIError
-from app.services.email_client import EmailClient, EmailConfigurationError
+from app.services.email.email_client import EmailClient, EmailConfigurationError
 
 ResendHandler = Callable[[httpx.Request], httpx.Response]
 
