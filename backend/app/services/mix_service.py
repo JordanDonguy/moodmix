@@ -100,7 +100,7 @@ class MixService:
 
             # Re-seed Postgres's RANDOM() at the start of each attempt so the
             # jitter sequence is deterministic for this (seed, tolerance) pair.
-            await self._db.execute(text(f"SELECT SETSEED({seed})"))
+            await self._db.execute(text("SELECT SETSEED(:seed)"), {"seed": seed})
 
             query = text(f"""
                 SELECT m.id, m.channel_name FROM mixes m
@@ -143,9 +143,9 @@ class MixService:
         instrumental: bool,
         n_active: int,
         tolerance: float,
-    ) -> tuple[str, str, dict[str, list[str]]]:
+    ) -> tuple[str, str, dict[str, object]]:
         """Build WHERE clause, ORDER BY, and bind params for a given tolerance."""
-        params: dict[str, list[str]] = {}
+        params: dict[str, object] = {}
 
         genre_subquery = ""
         if genres:
@@ -162,23 +162,34 @@ class MixService:
         where_clause = f"1=1 AND m.unavailable_at IS NULL AND m.mood IS NOT NULL {vocal_filter} {genre_subquery}"
 
         if n_active == 3:
-            query_vector = f"[{mood},{energy},{instrumentation}]"
-            order_by = f"(m.mood_vector <-> '{query_vector}'::vector) + (RANDOM() * {_JITTER})"
+            params["query_vector"] = f"[{mood},{energy},{instrumentation}]"
+            params["jitter"] = _JITTER
+            order_by = "(m.mood_vector <-> CAST(:query_vector AS vector)) + (RANDOM() * :jitter)"
         elif n_active == 0:
             order_by = "RANDOM()"
         else:
+            params["jitter"] = _JITTER
             parts: list[str] = []
             if mood is not None:
-                where_clause += f" AND m.mood BETWEEN {mood - tolerance} AND {mood + tolerance}"
-                parts.append(f"ABS(m.mood - {mood})")
+                params["mood"] = mood
+                params["mood_low"] = mood - tolerance
+                params["mood_high"] = mood + tolerance
+                where_clause += " AND m.mood BETWEEN :mood_low AND :mood_high"
+                parts.append("ABS(m.mood - :mood)")
             if energy is not None:
-                where_clause += f" AND m.energy BETWEEN {energy - tolerance} AND {energy + tolerance}"
-                parts.append(f"ABS(m.energy - {energy})")
+                params["energy"] = energy
+                params["energy_low"] = energy - tolerance
+                params["energy_high"] = energy + tolerance
+                where_clause += " AND m.energy BETWEEN :energy_low AND :energy_high"
+                parts.append("ABS(m.energy - :energy)")
             if instrumentation is not None:
-                where_clause += f" AND m.instrumentation BETWEEN {instrumentation - tolerance} AND {instrumentation + tolerance}"
-                parts.append(f"ABS(m.instrumentation - {instrumentation})")
+                params["instrumentation"] = instrumentation
+                params["instrumentation_low"] = instrumentation - tolerance
+                params["instrumentation_high"] = instrumentation + tolerance
+                where_clause += " AND m.instrumentation BETWEEN :instrumentation_low AND :instrumentation_high"
+                parts.append("ABS(m.instrumentation - :instrumentation)")
             distance = " + ".join(parts)
-            order_by = f"({distance}) + (RANDOM() * {_JITTER})"
+            order_by = f"({distance}) + (RANDOM() * :jitter)"
 
         return where_clause, order_by, params
 

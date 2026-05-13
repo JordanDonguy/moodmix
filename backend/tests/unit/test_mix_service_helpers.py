@@ -8,6 +8,7 @@ The pyright pragma above silences "private usage" warnings - test code
 intentionally exercises internal helpers to keep them under contract.
 """
 
+import math
 import uuid
 
 from app.services.mix_service import MixService
@@ -138,46 +139,54 @@ class TestBuildQuery:
         assert "BETWEEN" not in where
         assert params == {}
 
-    def test_one_slider_uses_range_filter_and_abs_distance(self):
+    def test_one_slider_uses_bound_range_and_abs_distance(self):
         # ACT
-        where, order_by, _ = MixService._build_query(
+        where, order_by, params = MixService._build_query(
             mood=0.5, energy=None, instrumentation=None,
             genres=None, instrumental=False, n_active=1, tolerance=0.25,
         )
 
         # ASSERT
-        assert "m.mood BETWEEN 0.25 AND 0.75" in where
-        assert "ABS(m.mood - 0.5)" in order_by
+        assert ":mood_low" in where
+        assert ":mood_high" in where
+        assert "0.5" not in where
+        assert "ABS(m.mood - :mood)" in order_by
         assert "m.energy" not in where
         assert "m.instrumentation" not in where
+        assert params["mood"] == 0.5
+        assert params["mood_low"] == 0.25
+        assert params["mood_high"] == 0.75
 
     def test_two_sliders_filters_and_orders_by_both(self):
         # ACT
-        where, order_by, _ = MixService._build_query(
+        where, order_by, params = MixService._build_query(
             mood=0.5, energy=-0.3, instrumentation=None,
             genres=None, instrumental=False, n_active=2, tolerance=0.25,
         )
 
         # ASSERT
-        assert "m.mood BETWEEN 0.25 AND 0.75" in where
-        assert "m.energy BETWEEN" in where  # exact float bounds vary; just check filter exists
-        assert "ABS(m.mood - 0.5)" in order_by
-        assert "ABS(m.energy - -0.3)" in order_by
+        assert ":mood_low" in where and ":mood_high" in where
+        assert ":energy_low" in where and ":energy_high" in where
+        assert "ABS(m.mood - :mood)" in order_by
+        assert "ABS(m.energy - :energy)" in order_by
+        assert params["mood"] == 0.5
+        assert params["energy"] == -0.3
 
     def test_three_sliders_uses_pgvector_l2_distance(self):
         # ACT
-        where, order_by, _ = MixService._build_query(
+        where, order_by, params = MixService._build_query(
             mood=0.5, energy=-0.3, instrumentation=0.8,
             genres=None, instrumental=False, n_active=3, tolerance=0.25,
         )
 
         # ASSERT
         assert "<->" in order_by  # pgvector L2 distance operator
-        assert "[0.5,-0.3,0.8]" in order_by
+        assert ":query_vector" in order_by
+        assert "0.5" not in order_by
+        assert params["query_vector"] == "[0.5,-0.3,0.8]"
         assert "BETWEEN" not in where  # 3-slider mode has no range filter
 
     def test_genres_added_as_bind_param(self):
-        """Genre slugs must go through bind params, not f-string interpolation (SQL injection guard)."""
         # ACT
         where, _, params = MixService._build_query(
             mood=None, energy=None, instrumentation=None,
@@ -187,9 +196,9 @@ class TestBuildQuery:
         # ASSERT
         assert ":genre_slugs" in where
         assert params == {"genre_slugs": ["jazz", "lo-fi"]}
-        assert "'jazz'" not in where  # never interpolated raw
+        assert "'jazz'" not in where
 
-    def test_no_genres_returns_empty_params(self):
+    def test_no_genres_omits_genre_param(self):
         # ACT
         _, _, params = MixService._build_query(
             mood=0.5, energy=None, instrumentation=None,
@@ -197,7 +206,7 @@ class TestBuildQuery:
         )
 
         # ASSERT
-        assert params == {}
+        assert "genre_slugs" not in params
 
     def test_instrumental_filter_added(self):
         # ACT
@@ -209,19 +218,21 @@ class TestBuildQuery:
         # ASSERT
         assert "m.has_vocals = false" in where
 
-    def test_tolerance_widens_range_filter(self):
+    def test_tolerance_widens_bound_range(self):
         """Wider tolerance produces a wider BETWEEN range."""
         # ACT
-        narrow_where, _, _ = MixService._build_query(
+        _, _, narrow_params = MixService._build_query(
             mood=0.5, energy=None, instrumentation=None,
             genres=None, instrumental=False, n_active=1, tolerance=0.25,
         )
-        wide_where, _, _ = MixService._build_query(
+        _, _, wide_params = MixService._build_query(
             mood=0.5, energy=None, instrumentation=None,
             genres=None, instrumental=False, n_active=1, tolerance=0.8,
         )
 
         # ASSERT - narrow range stays inside [0,1]; wide range crosses both bounds
-        assert "BETWEEN 0.25 AND 0.75" in narrow_where
-        assert "BETWEEN -0.3" in wide_where  # 0.5 - 0.8 = -0.3 (with float drift)
-        assert "AND 1.3" in wide_where  # 0.5 + 0.8 = 1.3
+        assert narrow_params["mood_low"] == 0.25
+        assert narrow_params["mood_high"] == 0.75
+        # 0.5 - 0.8 has float drift, so compare with isclose for the wide case
+        assert math.isclose(wide_params["mood_low"], -0.3)  # type: ignore[arg-type]
+        assert math.isclose(wide_params["mood_high"], 1.3)  # type: ignore[arg-type]
