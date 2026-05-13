@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,21 +36,32 @@ router = APIRouter(
 )
 
 
+def get_admin_service(db: AsyncSession = Depends(get_db)) -> AdminService:
+    return AdminService(db)
+
+
+async def get_crawler_service(
+    db: AsyncSession = Depends(get_db),
+) -> AsyncGenerator[CrawlerService]:
+    """Factory for CrawlerService. Handles YouTube client lifecycle."""
+    service = CrawlerService(db)
+    try:
+        yield service
+    finally:
+        await service.close()
+
+
 @router.post("/crawl/channel", response_model=CrawlResponse)
 async def crawl_channel(
     request: CrawlChannelRequest,
-    db: AsyncSession = Depends(get_db),
+    crawler: CrawlerService = Depends(get_crawler_service),
 ) -> CrawlResponse:
     """Crawl a specific YouTube channel for mixes."""
-    crawler = CrawlerService(db)
-
     mixes_found, mixes_added = await crawler.crawl_channel(
         channel_id=request.channel_id,
         channel_name=request.channel_name,
         max_videos=request.max_videos,
     )
-
-    await crawler.close()
 
     return CrawlResponse(
         channel_id=request.channel_id,
@@ -63,17 +75,13 @@ async def crawl_channel(
 async def crawl_search(
     query: str,
     max_results: int = 30,
-    db: AsyncSession = Depends(get_db),
+    crawler: CrawlerService = Depends(get_crawler_service),
 ) -> CrawlResponse:
     """Search YouTube for mixes matching a query."""
-    crawler = CrawlerService(db)
-
     mixes_found, mixes_added = await crawler.search_and_crawl(
         query=query,
         max_results=max_results,
     )
-
-    await crawler.close()
 
     return CrawlResponse(
         channel_id="search",
@@ -85,10 +93,9 @@ async def crawl_search(
 
 @router.get("/channels", response_model=list[ChannelResponse])
 async def list_channels(
-    db: AsyncSession = Depends(get_db),
+    service: AdminService = Depends(get_admin_service),
 ) -> list[ChannelResponse]:
     """List all seed channels."""
-    service = AdminService(db)
     channels = await service.list_channels()
     return [ChannelResponse.model_validate(c) for c in channels]
 
@@ -96,10 +103,9 @@ async def list_channels(
 @router.post("/channels", response_model=ChannelResponse, status_code=201)
 async def add_channel(
     request: AddChannelRequest,
-    db: AsyncSession = Depends(get_db),
+    service: AdminService = Depends(get_admin_service),
 ) -> ChannelResponse:
     """Register a new seed channel (without crawling)."""
-    service = AdminService(db)
     channel = await service.add_channel(
         channel_id=request.channel_id,
         channel_name=request.channel_name,
@@ -111,10 +117,9 @@ async def add_channel(
 async def update_channel(
     channel_id: str,
     request: ChannelUpdateRequest,
-    db: AsyncSession = Depends(get_db),
+    service: AdminService = Depends(get_admin_service),
 ) -> ChannelResponse:
     """Activate or deactivate a seed channel."""
-    service = AdminService(db)
     channel = await service.set_channel_active(channel_id, request.active)
     if not channel:
         raise AppException(f"Channel not found: {channel_id}", 404)
@@ -126,10 +131,9 @@ async def list_artists(
     search: str = Query(default=""),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    service: AdminService = Depends(get_admin_service),
 ) -> ArtistListResponse:
     """Search confirmed artists by name with track counts."""
-    service = AdminService(db)
     pairs, total = await service.list_artists(
         search=search, limit=limit, offset=offset
     )
@@ -181,10 +185,9 @@ async def get_fresh_preview(
 @router.get("/artists/{artist_id}/tracks", response_model=ArtistTracksResponse)
 async def get_artist_tracks(
     artist_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    service: AdminService = Depends(get_admin_service),
 ) -> ArtistTracksResponse:
     """Get all tracks for an artist."""
-    service = AdminService(db)
     artist, tracks = await service.get_artist_tracks(artist_id)
     if artist is None:
         raise AppException(f"Artist not found: {artist_id}", 404)
@@ -199,10 +202,9 @@ async def get_artist_tracks(
 @router.get("/pipeline/status", response_model=PipelineStatusResponse)
 async def pipeline_status(
     limit: int = 20,
-    db: AsyncSession = Depends(get_db),
+    service: AdminService = Depends(get_admin_service),
 ) -> PipelineStatusResponse:
     """Return recent pipeline runs."""
-    service = AdminService(db)
     runs, total = await service.get_pipeline_status(limit=limit)
     return PipelineStatusResponse(
         runs=[PipelineRunResponse.model_validate(r) for r in runs],

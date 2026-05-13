@@ -36,6 +36,10 @@ async def get_ai_search_service() -> AsyncGenerator[AiSearchService]:
         await service.close()
 
 
+def get_mix_service(db: AsyncSession = Depends(get_db)) -> MixService:
+    return MixService(db)
+
+
 @router.get("/search", response_model=MixSearchResponse)
 async def search_mixes(
     mood: float | None = Query(default=None, ge=-1.0, le=1.0),
@@ -46,12 +50,11 @@ async def search_mixes(
     seed: float = Query(default_factory=lambda: round(random.random(), 4), ge=0.0, le=1.0),
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    service: MixService = Depends(get_mix_service),
 ) -> MixSearchResponse:
     """Search mixes by mood sliders, genre filters and vocal preference."""
     genre_list = [g.strip() for g in genres.split(",")] if genres else None
 
-    service = MixService(db)
     mixes = await service.search_mixes(
         mood=mood,
         energy=energy,
@@ -75,8 +78,8 @@ async def search_mixes(
 async def ai_search(
     request: Request,  # required by slowapi for IP extraction
     body: AiSearchRequest,
-    db: AsyncSession = Depends(get_db),
     ai_service: AiSearchService = Depends(get_ai_search_service),
+    service: MixService = Depends(get_mix_service),
 ) -> AiSearchResponse:
     """Natural language search. LLM converts text to mood values, then searches."""
     try:
@@ -89,7 +92,6 @@ async def ai_search(
     genre_list = inferred.get("genres", [])
     instrumental = bool(inferred.get("instrumental", False))
 
-    service = MixService(db)
     mixes = await service.search_mixes(
         mood=inferred.get("mood"),  # type: ignore[arg-type]
         energy=inferred.get("energy"),  # type: ignore[arg-type]
@@ -116,10 +118,9 @@ async def ai_search(
 @router.get("/{mix_id}", response_model=MixResponse)
 async def get_mix(
     mix_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    service: MixService = Depends(get_mix_service),
 ) -> MixResponse:
     """Fetch a single mix by ID."""
-    service = MixService(db)
     mix = await service.get_mix_by_id(mix_id)
     if not mix:
         raise MixNotFoundException(str(mix_id))
@@ -129,10 +130,9 @@ async def get_mix(
 @router.post("/{mix_id}/report-unavailable", status_code=204)
 async def report_unavailable(
     mix_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    service: MixService = Depends(get_mix_service),
 ) -> None:
     """Mark a mix as unavailable (e.g., video deleted). Excludes it from future searches."""
-    service = MixService(db)
     found = await service.report_unavailable(mix_id)
     if not found:
         raise MixNotFoundException(str(mix_id))
