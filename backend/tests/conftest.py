@@ -51,10 +51,10 @@ async def db() -> AsyncGenerator[AsyncSession]:
     between tests, and the DB stays clean.
 
     The session uses join_transaction_mode="create_savepoint" so that any
-    session.commit() calls inside services (e.g. report_unavailable,
-    add_channel) commit a savepoint instead of the outer transaction, which
-    keeps test isolation intact.
-    It's basically a transaction within a transaction, so when service calls commit(), 
+    session.commit() calls made by public service methods (e.g.
+    report_unavailable, add_channel) commit a savepoint instead of the
+    outer transaction, which keeps test isolation intact.
+    It's basically a transaction within a transaction, so when a service commits(),
     the outer transaction is unaffected and can still roll back everything at the end of the test.
     """
     # Fresh engine per test to avoid asyncio event loop conflicts
