@@ -35,7 +35,9 @@ class CrawlerService:
         )
         logger.info("Found %d long embeddable videos in channel %s", len(video_ids), channel_id)
 
-        return await self._process_video_ids(video_ids, channel_id, channel_name)
+        result = await self._process_video_ids(video_ids, channel_id, channel_name)
+        await self._db.commit()
+        return result
 
     async def crawl_channel_via_playlist(
         self, channel_id: str, channel_name: str | None = None, max_videos: int = 2000,
@@ -58,7 +60,9 @@ class CrawlerService:
         video_ids = await self._youtube.get_playlist_video_ids(uploads_playlist, max_results=max_videos)
         logger.info("Found %d videos in uploads playlist for channel %s", len(video_ids), channel_id)
 
-        return await self._process_video_ids(video_ids, channel_id, channel_name)
+        result = await self._process_video_ids(video_ids, channel_id, channel_name)
+        await self._db.commit()
+        return result
 
     async def _process_video_ids(
         self, video_ids: list[str], channel_id: str, channel_name: str | None,
@@ -92,6 +96,7 @@ class CrawlerService:
         mixes, skipped = await self._youtube.get_video_details(video_ids)
         added = await self._insert_mixes(mixes)
         await self._insert_skipped(skipped)
+        await self._db.commit()
 
         return len(mixes), added
 
@@ -177,7 +182,7 @@ class CrawlerService:
             ).on_conflict_do_nothing(index_elements=["youtube_id"])
             await self._db.execute(stmt)
 
-        await self._db.commit()
+        await self._db.flush()
         added = len(mixes)
         logger.info("Inserted %d new mixes", added)
         return added
@@ -195,7 +200,7 @@ class CrawlerService:
             ).on_conflict_do_nothing(index_elements=["youtube_id"])
             await self._db.execute(stmt)
 
-        await self._db.commit()
+        await self._db.flush()
         logger.debug("Recorded %d skipped videos", len(skipped))
 
     async def _update_seed_channel(self, channel_id: str, channel_name: str | None, mixes_added: int) -> None:
@@ -219,4 +224,4 @@ class CrawlerService:
             .on_conflict_do_update(index_elements=["channel_id"], set_=set_dict)
         )
         await self._db.execute(stmt)
-        await self._db.commit()
+        await self._db.flush()
