@@ -5,17 +5,14 @@ import logging
 logging.getLogger("app").setLevel(logging.INFO)
 logging.getLogger("app").handlers = logging.getLogger("uvicorn").handlers
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 
 from app.admin import setup_admin
 from app.config import settings
 from app.database import engine
-from app.exceptions import AppException
+from app.exception_handlers import register_exception_handlers
 from app.routers import admin, auth, contact, genres, health, mixes, playback
 from app.routers.mixes import limiter
 
@@ -49,13 +46,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Exception handlers
-@app.exception_handler(AppException)
-async def app_exception_handler(request: Request, exc: AppException):
-    return JSONResponse(status_code=exc.status_code, content=exc.to_dict())
-
+register_exception_handlers(app)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 # Routers
 app.include_router(health.router)
