@@ -61,7 +61,7 @@ async def rate_limit_exception_handler(
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Wire all global exception handlers onto the FastAPI app."""
-    app.add_exception_handler(AppException, app_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(StarletteHTTPException, http_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)  # type: ignore[arg-type]
+    app.exception_handler(AppException)(app_exception_handler)
+    app.exception_handler(StarletteHTTPException)(http_exception_handler)
+    app.exception_handler(RequestValidationError)(validation_exception_handler)
+    app.exception_handler(RateLimitExceeded)(rate_limit_exception_handler)
