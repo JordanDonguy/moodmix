@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import html
+import json
 from typing import TYPE_CHECKING, Any
 
+from markupsafe import Markup
 from sqladmin import Admin, ModelView, action
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
@@ -196,20 +198,17 @@ class TrackAdmin(ModelView, model=Track):
         "artist",
         Track.isrc,
         Track.deezer_id,
-        Track.deezer_album_id,
         Track.duration_ms,
-        Track.preview_url,
-        Track.status,
         Track.created_at,
     ]
     column_searchable_list = [Track.title, Track.isrc, Track.deezer_id]
     column_sortable_list = [
-        Track.title, Track.status, Track.duration_ms,
+        Track.title, Track.duration_ms,
         Track.created_at, Track.updated_at,
     ]
     column_default_sort = ("created_at", True)
     page_size = 50
-    form_columns = ["title", "status", "exclusion_reason"]
+    form_columns = ["title"]
 
     @staticmethod
     def _artist_link(t: Track, _: str) -> str:
@@ -232,16 +231,6 @@ class TrackAdmin(ModelView, model=Track):
         )
 
     @staticmethod
-    def _deezer_album_link(t: Track, _: str) -> str:
-        if not t.deezer_album_id:
-            return ""
-        dz_album_id = html.escape(t.deezer_album_id)
-        return (
-            f'<a href="https://www.deezer.com/album/{dz_album_id}" '
-            f'target="_blank">{dz_album_id}</a>'
-        )
-
-    @staticmethod
     def _duration(t: Track, _: str) -> str:
         if not t.duration_ms:
             return ""
@@ -249,27 +238,45 @@ class TrackAdmin(ModelView, model=Track):
         return f"{seconds // 60}:{seconds % 60:02d}"
 
     @staticmethod
-    def _preview_audio(t: Track, _: str) -> str:
-        if not t.preview_url:
-            return ""
-        src = html.escape(t.preview_url)
-        return (
-            f'<audio controls preload="none" style="height:30px;width:200px;">'
-            f'<source src="{src}" type="audio/mpeg"></audio>'
+    def _mood_vector_str(t: Track, _: str) -> str:
+        if t.mood_vector is None:
+            return "—"
+        mood, energy, instr = t.mood_vector
+        return f"mood={mood:+.2f}  energy={energy:+.2f}  instr={instr:+.2f}"
+
+    @staticmethod
+    def _features_full(t: Track, _: str) -> str:
+        """Pretty-print the full features JSONB in a scrollable block.
+
+        SQLAdmin auto-escapes JSONB-column formatter returns, so we wrap with
+        Markup to opt out. The JSON content itself is still HTML-escaped via
+        html.escape before being interpolated.
+        """
+        if t.features is None:
+            return "—"
+        pretty = json.dumps(t.features, indent=2, ensure_ascii=False)
+        return Markup(
+            '<pre style="font-size:12px;max-height:600px;overflow:auto;'
+            'white-space:pre-wrap;background:#1a1a1a;color:#eee;'
+            f'padding:8px;border-radius:4px;">{html.escape(pretty)}</pre>'
         )
+
+    # The 1280-d Effnet embedding is too large to render in the admin UI;
+    # exclude it from the detail view entirely.
+    column_details_exclude_list = ["embedding"]
 
     # List view stays raw so values are copy-paste friendly. Duration is a
     # human-readable formatter, not HTML, so we keep it.
     column_formatters: dict[str, Any] = {  # type: ignore[assignment]
         "duration_ms": _duration,
     }
-    # Detail view keeps the rich HTML rendering — links, audio player, etc.
+
     column_formatters_detail = {  # type: ignore[assignment]
         "artist": _artist_link,
         "deezer_id": _deezer_track_link,
-        "deezer_album_id": _deezer_album_link,
         "duration_ms": _duration,
-        "preview_url": _preview_audio,
+        "mood_vector": _mood_vector_str,
+        "features": _features_full,
     }
 
 

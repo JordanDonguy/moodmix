@@ -53,15 +53,12 @@ def _build_track_payload(
     artist_id: uuid.UUID, dz_track: dict[str, Any]
 ) -> dict[str, Any]:
     """Translate a Deezer track payload into Track-model fields."""
-    album = dz_track.get("album") or {}
     duration_seconds = dz_track.get("duration") or 0
     return {
         "artist_id": artist_id,
         "title": dz_track["title"],
         "deezer_id": str(dz_track["id"]),
-        "deezer_album_id": str(album["id"]) if album.get("id") else None,
         "duration_ms": duration_seconds * 1000 if duration_seconds else None,
-        "preview_url": dz_track.get("preview") or None,
     }
 
 
@@ -97,9 +94,7 @@ async def _ingest_tracks_for_artist(
             track = existing_by_normalized[normalized]
             track.title = payload["title"]
             track.deezer_id = payload["deezer_id"]
-            track.deezer_album_id = payload["deezer_album_id"]
             track.duration_ms = payload["duration_ms"]
-            track.preview_url = payload["preview_url"]
             updated += 1
         else:
             db.add(Track(**payload))

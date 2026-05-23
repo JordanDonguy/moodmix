@@ -84,9 +84,7 @@ class TrackItem(BaseModel):
     deezer_id: str | None
     duration_ms: int | None
     release_date: date | None
-    preview_url: str | None
-    status: str
-    raw_genres: list[str] | None
+    classified_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
 
