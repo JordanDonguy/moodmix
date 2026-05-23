@@ -161,8 +161,7 @@ async def get_fresh_preview(
     """Fetch a fresh Deezer preview URL for a track.
 
     Stored preview URLs are signed CDN links that expire (~24h). Calling this
-    endpoint pulls the current URL from Deezer and persists it back to the row
-    so subsequent reads from the catalog are also fresh.
+    endpoint pulls the current URL from Deezer and return it to client.
     """
     track = await db.get(Track, track_id)
     if track is None or not track.deezer_id:
@@ -175,9 +174,6 @@ async def get_fresh_preview(
         await deezer.close()
 
     fresh_url = dz_track.get("preview") if dz_track else None
-    if fresh_url and fresh_url != track.preview_url:
-        track.preview_url = fresh_url
-        await db.commit()
 
     return FreshPreviewResponse(track_id=track.id, preview_url=fresh_url)
 

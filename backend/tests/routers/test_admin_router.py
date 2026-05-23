@@ -282,7 +282,7 @@ class TestFreshPreviewRoute:
         monkeypatch.setattr("app.routers.admin.DeezerClient", lambda: mock)
         return mock
 
-    async def test_returns_fresh_url_and_persists_to_db(
+    async def test_returns_fresh_url_from_deezer(
         self,
         client: httpx.AsyncClient,
         admin_headers: dict[str, str],
@@ -293,12 +293,7 @@ class TestFreshPreviewRoute:
         artist = Artist(name="Bonobo", resolution_tier="confirmed")
         db.add(artist)
         await db.flush()
-        track = Track(
-            artist_id=artist.id,
-            title="Kong",
-            deezer_id="12345",
-            preview_url="https://stale.url/track.mp3",
-        )
+        track = Track(artist_id=artist.id, title="Kong", deezer_id="12345")
         db.add(track)
         await db.flush()
 
@@ -312,42 +307,7 @@ class TestFreshPreviewRoute:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.json()
-        assert data["preview_url"] == fresh_url
-        # The route's commit() persisted the new URL onto the row
-        await db.refresh(track)
-        assert track.preview_url == fresh_url
-
-    async def test_no_change_when_url_already_fresh(
-        self,
-        client: httpx.AsyncClient,
-        admin_headers: dict[str, str],
-        db: AsyncSession,
-        monkeypatch: pytest.MonkeyPatch,
-    ):
-        # ARRANGE
-        artist = Artist(name="Bonobo", resolution_tier="confirmed")
-        db.add(artist)
-        await db.flush()
-        same_url = "https://same.cdn.dzcdn.net/stream/abc.mp3"
-        track = Track(
-            artist_id=artist.id,
-            title="Kong",
-            deezer_id="12345",
-            preview_url=same_url,
-        )
-        db.add(track)
-        await db.flush()
-        self._patch_deezer(monkeypatch, {"id": 12345, "preview": same_url})
-
-        # ACT
-        response = await client.get(
-            f"/api/admin/tracks/{track.id}/fresh-preview", headers=admin_headers,
-        )
-
-        # ASSERT
-        assert response.status_code == 200
-        assert response.json()["preview_url"] == same_url
+        assert response.json()["preview_url"] == fresh_url
 
     async def test_track_with_no_deezer_id_returns_404(
         self,
@@ -391,18 +351,12 @@ class TestFreshPreviewRoute:
         db: AsyncSession,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """When Deezer has no record (get_track returns None), return null URL
-        and leave the cached value untouched."""
+        """When Deezer has no record (get_track returns None), return null URL."""
         # ARRANGE
         artist = Artist(name="Bonobo", resolution_tier="confirmed")
         db.add(artist)
         await db.flush()
-        track = Track(
-            artist_id=artist.id,
-            title="Kong",
-            deezer_id="12345",
-            preview_url="https://cached.url/track.mp3",
-        )
+        track = Track(artist_id=artist.id, title="Kong", deezer_id="12345")
         db.add(track)
         await db.flush()
         self._patch_deezer(monkeypatch, None)
@@ -415,9 +369,6 @@ class TestFreshPreviewRoute:
         # ASSERT
         assert response.status_code == 200
         assert response.json()["preview_url"] is None
-        # Cached URL should not be wiped
-        await db.refresh(track)
-        assert track.preview_url == "https://cached.url/track.mp3"
 
 
 class TestPipelineStatus:

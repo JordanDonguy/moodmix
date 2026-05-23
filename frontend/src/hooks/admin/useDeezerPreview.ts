@@ -5,10 +5,8 @@ import type { TrackItem } from "../../types/catalog";
 /**
  * Manage a single audio element + the currently-previewing track.
  *
- * Deezer preview URLs are signed CDN links that expire (~24h). We optimistically
- * play the cached URL first — when it's fresh that keeps play() inside the
- * user-gesture context and avoids a roundtrip — and on failure fetch a fresh
- * URL from Deezer and retry.
+ * Deezer preview URLs are signed CDN links that expire (~24h), so we don't
+ * persist them — every play fetches a fresh URL from the backend.
  */
 export function useDeezerPreview(apiKey: string) {
 	const audioRef = useRef<HTMLAudioElement>(null);
@@ -25,27 +23,15 @@ export function useDeezerPreview(apiKey: string) {
 		setTrack(next);
 		if (!audio || !next.deezer_id) return;
 
-		const tryPlay = (url: string) => {
-			audio.src = url;
-			audio.load();
-			return audio.play();
-		};
-
 		try {
-			if (next.preview_url) {
-				await tryPlay(next.preview_url);
-				return;
+			const fresh = await getFreshPreview(apiKey, next.id);
+			if (fresh.preview_url) {
+				audio.src = fresh.preview_url;
+				audio.load();
+				await audio.play();
 			}
-			throw new Error("no cached url");
 		} catch {
-			try {
-				const fresh = await getFreshPreview(apiKey, next.id);
-				if (fresh.preview_url) {
-					await tryPlay(fresh.preview_url);
-				}
-			} catch {
-				// Both cached and fresh playback failed — user can click again.
-			}
+			// Fetch or playback failed — user can click again.
 		}
 	}
 
