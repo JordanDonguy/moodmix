@@ -23,20 +23,16 @@
 #### `tracks` table
 
 - `id` UUID PK
-- `artist_id` UUID FK → artists
+- `artist_id` UUID FK → artists (CASCADE on delete)
 - `title` TEXT NOT NULL (cleaned via `clean_track_title()`)
-- `isrc` TEXT UNIQUE (nullable — used as universal join key across providers)
-- `spotify_id` TEXT UNIQUE
+- `isrc` TEXT (nullable — used as universal join key across providers)
 - `deezer_id` TEXT UNIQUE
-- `deezer_album_id` TEXT
-- `preview_url` TEXT (30s Deezer preview)
 - `duration_ms` INTEGER
-- `raw_artists` TEXT (original chapter artist string, preserved)
-- `raw_genres` TEXT[]
-- `status` TEXT CHECK IN ('active', 'excluded') DEFAULT 'active'
-- `exclusion_reason` TEXT
+- `release_date` DATE
 - `created_at`, `updated_at`
-- Partial indexes on `isrc`, `deezer_album_id`, `status`
+- Partial index on `isrc` (WHERE NOT NULL)
+
+Audio classification and streaming-resolution columns are added in Sprint 11. Several columns initially scoped here (`deezer_album_id`, `preview_url`, `status`, `exclusion_reason`, `raw_artists`, `raw_genres`) were dropped before Sprint 11 — see [Sprint 11](11-classification-and-embedding.md) for the rationale.
 
 ### Services
 
@@ -89,7 +85,7 @@ Main Deezer resolver — for each confirmed/probable artist with no `deezer_id`:
 - Searches Deezer by name (up to 10 candidates)
 - Fetches top-50 tracks per candidate
 - Cross-references against existing chapter tracks via `normalize_track_title()`
-- On match: sets `deezer_id` on artist, upserts tracks (updates title/deezer_id/album_id/preview_url on chapter-track hits, inserts new)
+- On match: sets `deezer_id` on artist, upserts tracks (updates title + deezer_id on chapter-track hits, inserts new)
 - No match: sets tier to `ambiguous`
 
 #### 7. `find_deezer_artists_via_album_genres.py`
@@ -123,9 +119,9 @@ Fetches top-50 Deezer tracks for tier ∈ (probable, ambiguous) + `deezer_id` NO
 
 ## Out of scope
 
-- User-facing track browsing or playback endpoints (Sprint 11 admin panel first)
-- Lyrics, BPM, key detection
-- SoundCloud ingestion (deferred pending their API roadmap)
+- User-facing track browsing or playback endpoints (later sprint)
+- Audio analysis / classification / embeddings (Sprint 11)
+- Streaming-platform URL resolution for playback (Sprint 11)
 
 ## Done when
 
@@ -134,4 +130,4 @@ Fetches top-50 Deezer tracks for tier ∈ (probable, ambiguous) + `deezer_id` NO
 - Confirmed artists have `deezer_id` set and tracks ingested
 - Chapter-to-track backfill links tracks to their artist rows
 - Track titles are cleaned of decoration noise
-- ~130k tracks in DB across confirmed + recovered artists
+- ~75k tracks in DB across confirmed + recovered artists

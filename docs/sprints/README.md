@@ -19,11 +19,15 @@
 | [08](08-auth.md) | Authentication | 07 | Passwordless email-code auth + Google OAuth, JWT with refresh rotation |
 | [09](09-user-features.md) | User Features | 08 | Playback persistence (DB + localStorage), login-time state migration, smart play |
 | [10](10-artists-tracks.md) | Artists & Tracks Catalog | 09 | Artists/tracks models, Spotify/Deezer resolution pipeline, chapter backfill, all ingestion scripts |
-| [11](11-admin-panel.md) | Admin Panel | 10 | Genre coverage dashboard, artist management, Spotify/Deezer fetch triggers, track browser with Deezer embed preview |
+| [11](11-classification-and-embedding.md) | Classification & Embedding | 10 | Essentia audio classification + 1280-d embeddings, streaming URL resolution (SoundCloud + YouTube), reusable per-track / per-artist services |
+| [12](12-admin-panel.md) | Admin Panel | 11 | Genre + classification coverage dashboard, artist management, all pipeline triggers, track browser with previews + mood context |
+| [13](13-track-scenes-poc.md) | Track Scenes POC | 11, 12 | Admin workbench for experimenting with anchor-based playlist generation (embedding similarity + mood-vector shifting). Answers design questions before building the user-facing playlist engine. |
 
 ## Notes
 
 - **Sprint format is intentionally lean** - high-level scope and acceptance criteria, not a step-by-step task list. Adjust during implementation.
 - **Phase 2 has a strict order**: each sprint unblocks the next.
 - **Sprint 10 is the data foundation**: all scripts are idempotent and can be re-run as new channels are crawled.
-- **Sprint 11 admin panel** is the primary tool for ongoing catalog curation — adding artists, reviewing ambiguous matches, auditioning tracks via Deezer previews.
+- **Sprint 11 layers audio understanding** on top of the catalog: deterministic classification, embeddings for similarity, and playback URLs. Long-term services replace the one-shot backfill scripts used for initial seeding.
+- **Sprint 12 admin panel** is the primary tool for ongoing catalog curation — adding artists, auditioning tracks via Deezer previews, and triggering classification / streaming resolution on demand.
+- **Sprint 13 is a research sprint**: build the experimentation tool, run trials, document findings. Output is a set of recommended defaults (anchor mode, vocals threshold, shuffle strategy, etc.) that inform whatever user-facing playlist sprint comes next.
