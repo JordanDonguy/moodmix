@@ -19,8 +19,6 @@ export function DeezerPlayerBar({
 	artistName: string;
 	onClose: () => void;
 }) {
-	const showIframe = !!(track && !track.preview_url && track.deezer_id);
-
 	return (
 		<div
 			className={`border-t border-border bg-bg-secondary px-4 py-2 flex items-center gap-4 shrink-0 ${
@@ -34,22 +32,7 @@ export function DeezerPlayerBar({
 
 			<div className="flex-1">
 				{/* biome-ignore lint/a11y/useMediaCaption: 30s preview clip */}
-				<audio
-					ref={audioRef}
-					controls
-					className={`w-full h-8 ${track?.preview_url ? "" : "hidden"}`}
-				/>
-				{showIframe && track && (
-					<iframe
-						key={track.id}
-						title={track.title}
-						src={`https://widget.deezer.com/widget/dark/track/${track.deezer_id}`}
-						width="100%"
-						height="52"
-						style={{ border: "none" }}
-						allow="encrypted-media; fullscreen; clipboard-write"
-					/>
-				)}
+				<audio ref={audioRef} controls className="w-full h-8" />
 			</div>
 
 			<button

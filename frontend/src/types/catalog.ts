@@ -23,9 +23,7 @@ export interface TrackItem {
 	deezer_id: string | null;
 	duration_ms: number | null;
 	release_date: string | null;
-	preview_url: string | null;
-	status: string;
-	raw_genres: string[] | null;
+	classified_at: string | null;
 }
 
 export interface ArtistTracksResponse {

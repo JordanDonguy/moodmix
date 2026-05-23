@@ -23,15 +23,15 @@ export function TrackTable({
 					<tr className="border-b border-border text-text-muted text-left">
 						<th className="py-2 pr-4 font-medium">Title</th>
 						<th className="py-2 pr-4 font-medium">Duration</th>
-						<th className="py-2 pr-4 font-medium">Status</th>
-						<th className="py-2 pr-4 font-medium">Genres</th>
+						<th className="py-2 pr-4 font-medium">Classified</th>
 						<th className="py-2 font-medium">Preview</th>
 					</tr>
 				</thead>
 				<tbody>
 					{tracks.map((t) => {
-						const hasPreview = !!(t.deezer_id || t.preview_url);
+						const hasPreview = !!t.deezer_id;
 						const isPlaying = previewTrackId === t.id;
+						const isClassified = t.classified_at !== null;
 						return (
 							<tr
 								key={t.id}
@@ -49,18 +49,13 @@ export function TrackTable({
 								<td className="py-2 pr-4">
 									<span
 										className={`text-xs px-1.5 py-0.5 rounded ${
-											t.status === "active"
+											isClassified
 												? "bg-green-900/50 text-green-400"
-												: t.status === "excluded"
-													? "bg-red-900/50 text-red-400"
-													: "bg-bg-elevated text-text-muted"
+												: "bg-bg-elevated text-text-muted"
 										}`}
 									>
-										{t.status}
+										{isClassified ? "classified" : "pending"}
 									</span>
-								</td>
-								<td className="py-2 pr-4 text-text-muted text-xs max-w-xs truncate">
-									{t.raw_genres?.join(", ") ?? "—"}
 								</td>
 								<td className="py-2">
 									{hasPreview ? (
