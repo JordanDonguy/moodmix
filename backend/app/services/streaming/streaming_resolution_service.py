@@ -93,6 +93,12 @@ class StreamingResolutionService:
             track.soundcloud_url = soundcloud_url
         track.streaming_resolved_at = datetime.now(UTC)
 
+        log.info(
+            "%s — %s  →  YT:%s  SC:%s",
+            artist_name, track.title,
+            youtube_id or "(none)",
+            soundcloud_url or "(none)",
+        )
         await self._db.commit()
         return True
 
