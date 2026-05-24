@@ -20,6 +20,7 @@ dependencies = [
     "sqladmin>=0.23.0",
     "sqlalchemy>=2.0.48",
     "uvicorn>=0.42.0",
+    "yt-dlp>=2026.3.17",
 ]
 
 [dependency-groups]
