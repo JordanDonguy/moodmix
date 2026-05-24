@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     Text,
+    event,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -69,3 +70,20 @@ class Track(Base):
 
     def __str__(self) -> str:
         return self.title
+
+
+@event.listens_for(Track, "load")
+def _normalize_mood_vector_on_load(  # pyright: ignore[reportUnusedFunction]
+    target: Track, _context: Any,
+) -> None:
+    """Convert ``mood_vector`` from numpy array → Python list on load.
+
+    pgvector returns numpy arrays when numpy is installed (the default),
+    which breaks SQLAdmin's detail view — its internal ``if obj`` check
+    raises ``ValueError`` on multi-element numpy arrays. Cheap to
+    normalize on load for this 3-element column; ``embedding`` (1280-d)
+    stays numpy for fast similarity math.
+    """
+    if target.mood_vector is not None:
+        # list() on a list is a no-op copy; on numpy converts to list.
+        target.mood_vector = list(target.mood_vector)
