@@ -93,6 +93,11 @@ class TestClassifyTrack:
         # for a clean equality comparison.
         assert track.embedding is not None
         assert list(track.embedding) == [0.5] * 1280
+        # mood_vector is derived from features and persisted automatically.
+        # We don't assert specific values here (that's MoodVectorService's
+        # test surface); just that the wiring ran end-to-end.
+        assert track.mood_vector is not None
+        assert len(list(track.mood_vector)) == 3
 
     async def test_skips_already_classified_track(
         self, db: AsyncSession,

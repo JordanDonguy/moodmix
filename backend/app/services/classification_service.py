@@ -22,6 +22,7 @@ import httpx
 from sqlalchemy import select
 
 from app.models.track import Track
+from app.services.mood_vector import derive as derive_mood_vector
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,12 +86,9 @@ class ClassificationService:
 
         track.features = features
         track.embedding = embedding
+        track.mood_vector = list(derive_mood_vector(features))
         track.classifier_version = self._essentia.classifier_version
         track.classified_at = datetime.now(UTC)
-        # NB: mood_vector intentionally not persisted here. MoodVectorService
-        # derives it from `features` and will wire it there when implemented. 
-        # Until then, newly-classified tracks have mood_vector
-        # NULL and a backfill task fills them after MoodVectorService lands.
 
         await self._db.commit()
         return True
