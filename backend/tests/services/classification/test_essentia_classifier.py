@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from app.services.essentia_classifier import top_k
+from app.services.classification.essentia_classifier import top_k
 
 
 class TestTopK:

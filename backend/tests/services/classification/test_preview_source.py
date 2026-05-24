@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 from app.models.track import Track
-from app.services.preview_source import DeezerPreviewSource
+from app.services.classification.preview_source import DeezerPreviewSource
 
 
 def _track(deezer_id: str | None = "12345") -> Track:

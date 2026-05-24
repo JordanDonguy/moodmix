@@ -22,13 +22,13 @@ import httpx
 from sqlalchemy import select
 
 from app.models.track import Track
-from app.services.mood_vector import derive as derive_mood_vector
+from app.services.classification.mood_vector import derive as derive_mood_vector
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.services.essentia_classifier import EssentiaClassifier
-    from app.services.preview_source import PreviewSource
+    from app.services.classification.essentia_classifier import EssentiaClassifier
+    from app.services.classification.preview_source import PreviewSource
 
 log = logging.getLogger(__name__)
 

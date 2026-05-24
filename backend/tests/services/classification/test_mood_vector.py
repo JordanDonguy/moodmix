@@ -5,8 +5,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from app.services import mood_vector as mv
-from app.services.mood_vector import derive
+from app.services.classification import mood_vector as mv
+from app.services.classification.mood_vector import derive
 
 
 def _features(  # noqa: PLR0913 — test builder, all defaults are neutral

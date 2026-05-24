@@ -15,7 +15,7 @@ import httpx
 
 from app.models.artist import Artist
 from app.models.track import Track
-from app.services.classification_service import ClassificationService
+from app.services.classification.classification_service import ClassificationService
 
 # Avoid importing AsyncSession at runtime in tests — only used as a type
 # hint in fixture signatures.

@@ -45,7 +45,7 @@ from sqlalchemy import select
 
 from app.database import async_session
 from app.models.track import Track
-from app.services.mood_vector import derive
+from app.services.classification.mood_vector import derive
 
 PROGRESS_EVERY = 5000
 STREAM_CHUNK_SIZE = 500
