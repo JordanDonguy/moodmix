@@ -51,6 +51,17 @@ async def get_crawler_service(
         await service.close()
 
 
+@router.get("/auth-check")
+async def auth_check() -> dict[str, bool]:
+    """Validate the admin API key. Returns ``{ok: true}`` on success.
+
+    The router-level ``require_admin_key`` dependency does the actual check
+    — this endpoint exists so the frontend can verify the key the user
+    typed before persisting it and unlocking the admin UI.
+    """
+    return {"ok": True}
+
+
 @router.post("/crawl/channel", response_model=CrawlResponse)
 async def crawl_channel(
     request: CrawlChannelRequest,
