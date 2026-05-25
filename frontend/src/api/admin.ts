@@ -9,6 +9,15 @@ function adminHeaders(apiKey: string): HeadersInit {
 	return { "X-API-Key": apiKey };
 }
 
+export function checkAdminKey(apiKey: string): Promise<{ ok: boolean }> {
+	// skipRefreshOn401: the admin key is a separate auth channel from user
+	// JWTs — silent refresh has nothing to offer and would just add a round-trip.
+	return apiFetch<{ ok: boolean }>("/api/admin/auth-check", {
+		headers: adminHeaders(apiKey),
+		skipRefreshOn401: true,
+	});
+}
+
 export function listArtists(
 	apiKey: string,
 	params: { search?: string; limit?: number; offset?: number } = {},
