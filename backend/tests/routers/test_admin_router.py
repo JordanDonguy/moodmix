@@ -48,6 +48,39 @@ class TestAdminAuth:
         assert response.status_code == 403
 
 
+class TestAuthCheck:
+    async def test_valid_key_returns_ok(
+        self, client: httpx.AsyncClient, admin_headers: dict[str, str],
+    ):
+        # ACT
+        response = await client.get("/api/admin/auth-check", headers=admin_headers)
+
+        # ASSERT
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+
+    async def test_missing_key_returns_unauthorized(
+        self, client: httpx.AsyncClient,
+    ):
+        # ACT
+        response = await client.get("/api/admin/auth-check")
+
+        # ASSERT
+        assert response.status_code in (401, 403)
+
+    async def test_wrong_key_returns_forbidden(
+        self, client: httpx.AsyncClient, admin_headers: dict[str, str],
+    ):
+        # ACT
+        response = await client.get(
+            "/api/admin/auth-check",
+            headers={"X-API-Key": "wrong-key"},
+        )
+
+        # ASSERT
+        assert response.status_code == 403
+
+
 class TestListChannels:
     async def test_returns_empty_list(
         self, client: httpx.AsyncClient, admin_headers: dict[str, str],
