@@ -36,6 +36,7 @@ from app.database import async_session
 from app.models.artist import Artist
 from app.models.track import Track
 from app.services.clients.deezer_client import DeezerClient
+from app.services.track_import import TrackImportService
 from scripts._track_title import normalize_track_title
 
 
@@ -49,24 +50,12 @@ MAX_CANDIDATES = 10
 TOP_TRACKS_LIMIT = 50
 
 
-def _build_track_payload(
-    artist_id: uuid.UUID, dz_track: dict[str, Any]
-) -> dict[str, Any]:
-    """Translate a Deezer track payload into Track-model fields."""
-    duration_seconds = dz_track.get("duration") or 0
-    return {
-        "artist_id": artist_id,
-        "title": dz_track["title"],
-        "deezer_id": str(dz_track["id"]),
-        "duration_ms": duration_seconds * 1000 if duration_seconds else None,
-    }
-
-
 async def _ingest_tracks_for_artist(
     db: Any,
     artist_id: uuid.UUID,
     deezer_top: list[dict[str, Any]],
     seen_deezer_track_ids: set[str],
+    importer: TrackImportService,
 ) -> tuple[int, int, int]:
     """Match Deezer top-tracks against existing chapter rows; insert/update.
 
@@ -88,16 +77,14 @@ async def _ingest_tracks_for_artist(
             continue
 
         normalized = normalize_track_title(dz_track["title"])
-        payload = _build_track_payload(artist_id, dz_track)
 
         if normalized and normalized in existing_by_normalized:
-            track = existing_by_normalized[normalized]
-            track.title = payload["title"]
-            track.deezer_id = payload["deezer_id"]
-            track.duration_ms = payload["duration_ms"]
+            await importer.update_from_deezer(
+                existing_by_normalized[normalized], dz_track,
+            )
             updated += 1
         else:
-            db.add(Track(**payload))
+            await importer.import_from_deezer(artist_id, dz_track)
             inserted += 1
 
         seen_deezer_track_ids.add(dz_id)
@@ -146,6 +133,7 @@ async def main() -> None:
         total_inserted = total_updated = 0
 
         async with async_session() as db:
+            importer = TrackImportService(db)
             for i, artist in enumerate(artists, 1):
                 # Pull our chapter-derived tracks for this artist
                 our_tracks_result = await db.execute(
@@ -205,7 +193,8 @@ async def main() -> None:
                     matched += 1
 
                     inserted, updated, _ = await _ingest_tracks_for_artist(
-                        db, artist.id, chosen_top_tracks, seen_deezer_track_ids
+                        db, artist.id, chosen_top_tracks,
+                        seen_deezer_track_ids, importer,
                     )
                     total_inserted += inserted
                     total_updated += updated
