@@ -36,7 +36,7 @@ from app.database import async_session
 from app.models.artist import Artist
 from app.models.track import Track
 from app.services.clients.deezer_client import DeezerClient
-from app.services.track_import import TrackImportService
+from app.services.imports.track_import_service import TrackImportService
 from scripts._track_title import normalize_track_title
 
 
