@@ -16,6 +16,12 @@ than a concrete client, so the persistence orchestration stays usable
 even if a second source (Spotify, Apple Music, …) is wired in later.
 Today's only implementation is :class:`DeezerClient`.
 
+The protocol stays dict-typed because it sits at the external-API
+boundary; the service parses raw payloads into typed
+:class:`DeezerArtist` / :class:`DeezerTrack` models at the boundary,
+so the rest of the codebase never sees a ``dict[str, Any]`` from this
+layer.
+
 Streaming-link resolution, classification, and Spotify-genre resolution
 are separate triggers — this service stops once the artist + tracks are
 persisted with their source-side metadata.
@@ -34,6 +40,7 @@ from app.exceptions import (
 )
 from app.models.artist import Artist
 from app.models.track import Track
+from app.services.clients.deezer_models import DeezerArtist, DeezerTrack
 from app.services.imports.track_import_service import TrackImportService
 
 if TYPE_CHECKING:
@@ -48,9 +55,9 @@ DEFAULT_SEARCH_LIMIT = 10
 class MusicCatalogSource(Protocol):
     """The slice of a music-catalog API client this service depends on.
 
-    Any client that can search artists, fetch an artist's metadata, list
-    their top tracks, and fetch a single track's full payload satisfies
-    this contract — see ``DeezerClient`` for the current implementation.
+    Methods return raw ``dict[str, Any]`` because they sit at the
+    external-API boundary — the service parses them into typed models
+    before handing data to the rest of the codebase.
     """
 
     async def search_artist(
@@ -81,17 +88,19 @@ class ArtistImportService:
 
     async def search_artists(
         self, name: str, limit: int = DEFAULT_SEARCH_LIMIT,
-    ) -> list[dict[str, Any]]:
-        """Return ranked candidates for ``name`` from the source."""
-        return await self._source.search_artist(name, limit=limit)
+    ) -> list[DeezerArtist]:
+        """Return ranked candidates for ``name``, parsed from the source."""
+        raw = await self._source.search_artist(name, limit=limit)
+        return [DeezerArtist.model_validate(r) for r in raw]
 
     async def get_top_tracks(
         self, source_artist_id: str, limit: int = DEFAULT_TOP_TRACKS_LIMIT,
-    ) -> list[dict[str, Any]]:
+    ) -> list[DeezerTrack]:
         """Fetch a source artist's top tracks for the preview panel."""
-        return await self._source.get_artist_top_tracks(
+        raw = await self._source.get_artist_top_tracks(
             source_artist_id, limit=limit,
         )
+        return [DeezerTrack.model_validate(t) for t in raw]
 
     async def import_artist(
         self, source_artist_id: str,
@@ -119,33 +128,33 @@ class ArtistImportService:
         if existing.scalar_one_or_none() is not None:
             raise ArtistAlreadyExistsException(source_artist_id)
 
-        source_artist = await self._source.get_artist(source_artist_id)
-        if source_artist is None:
+        raw_artist = await self._source.get_artist(source_artist_id)
+        if raw_artist is None:
             raise ArtistNotFoundException(source_artist_id)
+        source_artist = DeezerArtist.model_validate(raw_artist)
 
         artist = Artist(
-            name=source_artist["name"],
+            name=source_artist.name,
             deezer_id=source_artist_id,
-            image_url=(
-                source_artist.get("picture_big") or source_artist.get("picture")
-            ),
+            image_url=source_artist.picture_big or source_artist.picture,
             resolution_tier="confirmed",
         )
         self._db.add(artist)
         await self._db.flush()  # populate artist.id for track FKs
 
-        top_tracks = await self._source.get_artist_top_tracks(
+        raw_top_tracks = await self._source.get_artist_top_tracks(
             source_artist_id, limit=top_tracks_limit,
         )
+        top_tracks = [DeezerTrack.model_validate(t) for t in raw_top_tracks]
 
         # Pre-fetch existing source IDs in one query so we don't issue one
         # SELECT per imported track just to dedupe.
-        candidate_ids = [str(t["id"]) for t in top_tracks]
+        candidate_ids = [str(t.id) for t in top_tracks]
         seen_ids = await self._existing_track_source_ids(candidate_ids)
 
         inserted = skipped = 0
         for top_track in top_tracks:
-            source_track_id = str(top_track["id"])
+            source_track_id = str(top_track.id)
             if source_track_id in seen_ids:
                 log.info(
                     "track source_id=%s already in catalog — skipping",
@@ -182,19 +191,20 @@ class ArtistImportService:
 
     async def _fetch_enriched_payload(
         self, source_track_id: str,
-    ) -> dict[str, Any] | None:
-        """Fetch the full track payload for enrichment. Returns ``None`` on
-        404 or transient failure — caller skips the track."""
+    ) -> DeezerTrack | None:
+        """Fetch the full track payload, parsed at the boundary. Returns
+        ``None`` on 404 or transient failure — caller skips the track."""
         try:
-            payload = await self._source.get_track(source_track_id)
+            raw = await self._source.get_track(source_track_id)
         except Exception:  # noqa: BLE001 — one bad track shouldn't kill the import
             log.warning(
                 "track source_id=%s: enrichment fetch failed, skipping",
                 source_track_id, exc_info=True,
             )
             return None
-        if payload is None:
+        if raw is None:
             log.info(
                 "track source_id=%s: not found upstream, skipping", source_track_id,
             )
-        return payload
+            return None
+        return DeezerTrack.model_validate(raw)

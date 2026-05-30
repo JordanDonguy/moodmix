@@ -36,6 +36,7 @@ from app.database import async_session
 from app.models.artist import Artist
 from app.models.track import Track
 from app.services.clients.deezer_client import DeezerClient
+from app.services.clients.deezer_models import DeezerTrack
 from app.services.imports.track_import_service import TrackImportService
 from scripts._track_title import normalize_track_title
 
@@ -76,15 +77,16 @@ async def _ingest_tracks_for_artist(
             dup_skipped += 1
             continue
 
-        normalized = normalize_track_title(dz_track["title"])
+        parsed = DeezerTrack.model_validate(dz_track)
+        normalized = normalize_track_title(parsed.title)
 
         if normalized and normalized in existing_by_normalized:
             await importer.update_from_deezer(
-                existing_by_normalized[normalized], dz_track,
+                existing_by_normalized[normalized], parsed,
             )
             updated += 1
         else:
-            await importer.import_from_deezer(artist_id, dz_track)
+            await importer.import_from_deezer(artist_id, parsed)
             inserted += 1
 
         seen_deezer_track_ids.add(dz_id)

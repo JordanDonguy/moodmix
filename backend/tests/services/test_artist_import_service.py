@@ -18,6 +18,7 @@ from app.exceptions import (
 )
 from app.models.artist import Artist
 from app.models.track import Track
+from app.services.clients.deezer_models import DeezerArtist, DeezerTrack
 from app.services.imports.artist_import_service import (
     ArtistImportService,
     MusicCatalogSource,
@@ -88,36 +89,37 @@ def _artist_payload(
 
 
 class TestSearchArtists:
-    async def test_passes_query_through_to_source(
-        self, db: AsyncSession,
-    ) -> None:
+    async def test_returns_parsed_candidates(self, db: AsyncSession) -> None:
         # ARRANGE
-        candidates = [_artist_payload(deezer_id=1, name="One")]
-        source = _source(search_results=candidates)
+        # Raw dicts come in; the service is responsible for parsing them
+        # into DeezerArtist before handing them upstream.
+        source = _source(
+            search_results=[_artist_payload(deezer_id=1, name="One")],
+        )
         service = ArtistImportService(db, source)
 
         # ACT
         result = await service.search_artists("test query", limit=5)
 
         # ASSERT
-        assert result == candidates
+        assert isinstance(result[0], DeezerArtist)
+        assert result[0].id == 1
+        assert result[0].name == "One"
         source.search_artist.assert_awaited_once_with("test query", limit=5)
 
 
 class TestGetTopTracks:
-    async def test_passes_id_and_limit_through_to_source(
-        self, db: AsyncSession,
-    ) -> None:
+    async def test_returns_parsed_tracks(self, db: AsyncSession) -> None:
         # ARRANGE
-        tracks = [_top_track(1), _top_track(2)]
-        source = _source(top_tracks=tracks)
+        source = _source(top_tracks=[_top_track(1), _top_track(2)])
         service = ArtistImportService(db, source)
 
         # ACT
         result = await service.get_top_tracks("123", limit=25)
 
         # ASSERT
-        assert result == tracks
+        assert [type(t) for t in result] == [DeezerTrack, DeezerTrack]
+        assert [t.id for t in result] == [1, 2]
         source.get_artist_top_tracks.assert_awaited_once_with("123", limit=25)
 
 

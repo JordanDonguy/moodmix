@@ -18,14 +18,22 @@ from app.schemas.admin import (
     ChannelUpdateRequest,
     CrawlChannelRequest,
     CrawlResponse,
+    DeezerArtistCandidate,
+    DeezerSearchResponse,
+    DeezerTopTrackPreview,
+    DeezerTopTracksResponse,
     FreshPreviewResponse,
+    ImportArtistRequest,
+    ImportArtistResponse,
     PipelineRunResponse,
     PipelineStatusResponse,
     TrackItem,
 )
 from app.services.admin_service import AdminService
-from app.services.crawler_service import CrawlerService
 from app.services.clients.deezer_client import DeezerClient
+from app.services.clients.deezer_models import DeezerArtist, DeezerTrack
+from app.services.crawler_service import CrawlerService
+from app.services.imports.artist_import_service import ArtistImportService
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +57,36 @@ async def get_crawler_service(
         yield service
     finally:
         await service.close()
+
+
+async def get_artist_import_service(
+    db: AsyncSession = Depends(get_db),
+) -> AsyncGenerator[ArtistImportService]:
+    """Factory for ArtistImportService. Owns the DeezerClient lifecycle."""
+    deezer = DeezerClient()
+    try:
+        yield ArtistImportService(db, deezer)
+    finally:
+        await deezer.close()
+
+
+def _candidate_response(parsed: DeezerArtist) -> DeezerArtistCandidate:
+    return DeezerArtistCandidate(
+        deezer_id=str(parsed.id),
+        name=parsed.name,
+        picture_url=parsed.picture_big or parsed.picture,
+        nb_fan=parsed.nb_fan,
+        nb_album=parsed.nb_album,
+    )
+
+
+def _top_track_response(parsed: DeezerTrack) -> DeezerTopTrackPreview:
+    return DeezerTopTrackPreview(
+        deezer_id=str(parsed.id),
+        title=parsed.title,
+        duration_seconds=parsed.duration,
+        preview_url=parsed.preview,
+    )
 
 
 @router.get("/auth-check")
@@ -216,4 +254,67 @@ async def pipeline_status(
     return PipelineStatusResponse(
         runs=[PipelineRunResponse.model_validate(r) for r in runs],
         total=total,
+    )
+
+
+@router.get("/deezer/search-artist", response_model=DeezerSearchResponse)
+async def deezer_search_artist(
+    name: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=25),
+    service: ArtistImportService = Depends(get_artist_import_service),
+) -> DeezerSearchResponse:
+    """Search Deezer for artists matching ``name``.
+
+    Returns ranked candidates with the metadata the admin needs to pick
+    the right one (image, fan count, album count). Tracks are NOT
+    pre-fetched here — the UI fires a separate ``/top-tracks`` call once
+    the admin chooses a candidate.
+    """
+    candidates = await service.search_artists(name, limit=limit)
+    return DeezerSearchResponse(
+        candidates=[_candidate_response(c) for c in candidates],
+    )
+
+
+@router.get(
+    "/deezer/artists/{deezer_artist_id}/top-tracks",
+    response_model=DeezerTopTracksResponse,
+)
+async def deezer_artist_top_tracks(
+    deezer_artist_id: str,
+    limit: int = Query(50, ge=1, le=100),
+    service: ArtistImportService = Depends(get_artist_import_service),
+) -> DeezerTopTracksResponse:
+    """Fetch top tracks for a Deezer artist (preview before import)."""
+    tracks = await service.get_top_tracks(deezer_artist_id, limit=limit)
+    return DeezerTopTracksResponse(
+        tracks=[_top_track_response(t) for t in tracks],
+    )
+
+
+@router.post(
+    "/artists/import-from-deezer",
+    response_model=ImportArtistResponse,
+    status_code=201,
+)
+async def import_artist_from_deezer(
+    request: ImportArtistRequest,
+    service: ArtistImportService = Depends(get_artist_import_service),
+) -> ImportArtistResponse:
+    """Create a new Artist + import top tracks with full enrichment.
+
+    Raises 409 if an Artist with this deezer_id already exists, 404 if
+    Deezer doesn't recognise the ID. Per-track failures during the
+    enrichment pass are swallowed and counted in ``tracks_skipped``.
+    """
+    artist, inserted, skipped = await service.import_artist(
+        request.deezer_artist_id,
+    )
+    return ImportArtistResponse(
+        artist_id=artist.id,
+        name=artist.name,
+        image_url=artist.image_url,
+        deezer_id=artist.deezer_id or request.deezer_artist_id,
+        tracks_inserted=inserted,
+        tracks_skipped=skipped,
     )
