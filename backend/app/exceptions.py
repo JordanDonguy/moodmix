@@ -24,6 +24,21 @@ class ChannelAlreadyExistsException(AppException):
         super().__init__(f"Channel already exists: {channel_id}" if channel_id else "Channel already exists", 409)
 
 
+class ArtistAlreadyExistsException(AppException):
+    def __init__(self, deezer_id: str = ""):
+        msg = (
+            f"Artist already exists with deezer_id={deezer_id}"
+            if deezer_id else "Artist already exists"
+        )
+        super().__init__(msg, 409)
+
+
+class ArtistNotFoundException(AppException):
+    def __init__(self, identifier: str = ""):
+        msg = f"Artist not found: {identifier}" if identifier else "Artist not found"
+        super().__init__(msg, 404)
+
+
 class RateLimitExceededException(AppException):
     def __init__(self):
         super().__init__("Rate limit exceeded. Please try again later.", 429)

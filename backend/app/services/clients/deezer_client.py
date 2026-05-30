@@ -86,6 +86,16 @@ class DeezerClient:
             return []
         return cast(list[dict[str, Any]], raw_items)
 
+    async def get_artist(self, artist_id: str | int) -> dict[str, Any] | None:
+        """Fetch a Deezer artist. Includes ``name``, ``nb_fan``, ``nb_album``,
+        and ``picture_{small,medium,big,xl}`` URLs."""
+        try:
+            return await self._get(f"/artist/{artist_id}")
+        except RuntimeError as e:
+            if "'code': 800" in str(e) or '"code": 800' in str(e):
+                return None
+            raise
+
     async def get_artist_top_tracks(
         self, artist_id: str | int, limit: int = 50
     ) -> list[dict[str, Any]]:

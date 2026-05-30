@@ -99,3 +99,41 @@ class ArtistTracksResponse(BaseModel):
 class FreshPreviewResponse(BaseModel):
     track_id: uuid.UUID
     preview_url: str | None
+
+
+class DeezerArtistCandidate(BaseModel):
+    """One Deezer artist matching a search query, shown to the admin for picking."""
+    deezer_id: str
+    name: str
+    picture_url: str | None
+    nb_fan: int | None
+    nb_album: int | None
+
+
+class DeezerSearchResponse(BaseModel):
+    candidates: list[DeezerArtistCandidate]
+
+
+class DeezerTopTrackPreview(BaseModel):
+    """One top-track from Deezer, used in the preview panel before import."""
+    deezer_id: str
+    title: str
+    duration_seconds: int | None
+    preview_url: str | None
+
+
+class DeezerTopTracksResponse(BaseModel):
+    tracks: list[DeezerTopTrackPreview]
+
+
+class ImportArtistRequest(BaseModel):
+    deezer_artist_id: str
+
+
+class ImportArtistResponse(BaseModel):
+    artist_id: uuid.UUID
+    name: str
+    image_url: str | None
+    deezer_id: str
+    tracks_inserted: int
+    tracks_skipped: int
