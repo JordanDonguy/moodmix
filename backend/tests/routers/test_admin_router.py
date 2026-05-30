@@ -418,3 +418,290 @@ class TestPipelineStatus:
         assert "total" in data
         assert data["runs"] == []
         assert data["total"] == 0
+
+
+def _patch_admin_deezer_client(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    artist: dict[str, Any] | None = None,
+    top_tracks: list[dict[str, Any]] | None = None,
+    full_tracks: dict[str, dict[str, Any] | None] | None = None,
+    search_results: list[dict[str, Any]] | None = None,
+) -> AsyncMock:
+    """Replace the DeezerClient the admin router instantiates with a mock.
+
+    The mock conforms to MusicCatalogSource so the service inside the
+    router uses it transparently. Per-track lookups are dispatched off
+    a dict keyed by the source id so multi-track import tests can wire
+    different responses per id.
+    """
+    mock = AsyncMock()
+    mock.search_artist = AsyncMock(return_value=search_results or [])
+    mock.get_artist = AsyncMock(return_value=artist)
+    mock.get_artist_top_tracks = AsyncMock(return_value=top_tracks or [])
+    mock.close = AsyncMock()
+
+    full_tracks = full_tracks or {}
+
+    async def fake_get_track(track_id: str | int) -> dict[str, Any] | None:
+        return full_tracks.get(str(track_id))
+
+    mock.get_track = AsyncMock(side_effect=fake_get_track)
+    monkeypatch.setattr("app.routers.admin.DeezerClient", lambda: mock)
+    return mock
+
+
+class TestDeezerSearchArtist:
+    async def test_returns_parsed_candidates(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        # ARRANGE
+        _patch_admin_deezer_client(
+            monkeypatch,
+            search_results=[
+                {
+                    "id": 27,
+                    "name": "Test Artist",
+                    "picture": "https://cdn.example/small.jpg",
+                    "picture_big": "https://cdn.example/big.jpg",
+                    "nb_fan": 1234,
+                    "nb_album": 5,
+                },
+            ],
+        )
+
+        # ACT
+        response = await client.get(
+            "/api/admin/deezer/search-artist?name=test&limit=5",
+            headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        candidates = response.json()["candidates"]
+        assert len(candidates) == 1
+        assert candidates[0] == {
+            "deezer_id": "27",
+            "name": "Test Artist",
+            "picture_url": "https://cdn.example/big.jpg",
+            "nb_fan": 1234,
+            "nb_album": 5,
+        }
+
+    async def test_falls_back_to_small_picture(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        # ARRANGE
+        # Some Deezer candidates don't carry picture_big — the response
+        # should fall back to the smaller picture URL.
+        _patch_admin_deezer_client(
+            monkeypatch,
+            search_results=[
+                {
+                    "id": 1,
+                    "name": "Test Artist",
+                    "picture": "https://cdn.example/small.jpg",
+                },
+            ],
+        )
+
+        # ACT
+        response = await client.get(
+            "/api/admin/deezer/search-artist?name=t", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        candidates = response.json()["candidates"]
+        assert candidates[0]["picture_url"] == "https://cdn.example/small.jpg"
+
+    async def test_missing_name_returns_422(
+        self, client: httpx.AsyncClient, admin_headers: dict[str, str],
+    ):
+        # ACT
+        response = await client.get(
+            "/api/admin/deezer/search-artist", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 422
+
+    async def test_limit_above_max_returns_422(
+        self, client: httpx.AsyncClient, admin_headers: dict[str, str],
+    ):
+        # ACT
+        # Limit is capped at 25 — anything over should be rejected before
+        # the DeezerClient is ever instantiated.
+        response = await client.get(
+            "/api/admin/deezer/search-artist?name=t&limit=200",
+            headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 422
+
+
+class TestDeezerArtistTopTracks:
+    async def test_returns_parsed_tracks(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        # ARRANGE
+        _patch_admin_deezer_client(
+            monkeypatch,
+            top_tracks=[
+                {
+                    "id": 9001,
+                    "title": "Song A",
+                    "duration": 240,
+                    "preview": "https://cdn.example/preview.mp3",
+                },
+                {
+                    "id": 9002,
+                    "title": "Song B",
+                    "duration": 0,  # quirk — coerces to None
+                },
+            ],
+        )
+
+        # ACT
+        response = await client.get(
+            "/api/admin/deezer/artists/27/top-tracks?limit=10",
+            headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        tracks = response.json()["tracks"]
+        assert tracks[0] == {
+            "deezer_id": "9001",
+            "title": "Song A",
+            "duration_seconds": 240,
+            "preview_url": "https://cdn.example/preview.mp3",
+        }
+        # Zero duration coerced to null by the DeezerTrack validators
+        assert tracks[1]["duration_seconds"] is None
+        assert tracks[1]["preview_url"] is None
+
+    async def test_limit_above_max_returns_422(
+        self, client: httpx.AsyncClient, admin_headers: dict[str, str],
+    ):
+        # ACT
+        # Top-tracks limit caps at 100 (Deezer's own hard cap).
+        response = await client.get(
+            "/api/admin/deezer/artists/27/top-tracks?limit=500",
+            headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 422
+
+
+class TestImportArtistFromDeezer:
+    async def test_creates_artist_and_tracks(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        # ARRANGE
+        _patch_admin_deezer_client(
+            monkeypatch,
+            artist={
+                "id": 27, "name": "Test Artist",
+                "picture_big": "https://cdn.example/big.jpg",
+            },
+            top_tracks=[
+                {"id": 9001, "title": "Song A", "duration": 240},
+            ],
+            full_tracks={
+                "9001": {
+                    "id": 9001, "title": "Song A", "duration": 240,
+                    "isrc": "USRC17607839", "release_date": "2020-05-15",
+                    "gain": -8.4,
+                },
+            },
+        )
+
+        # ACT
+        response = await client.post(
+            "/api/admin/artists/import-from-deezer",
+            headers=admin_headers,
+            json={"deezer_artist_id": "27"},
+        )
+
+        # ASSERT
+        assert response.status_code == 201
+        body = response.json()
+        assert body["name"] == "Test Artist"
+        assert body["deezer_id"] == "27"
+        assert body["image_url"] == "https://cdn.example/big.jpg"
+        assert body["tracks_inserted"] == 1
+        assert body["tracks_skipped"] == 0
+        # Confirm the Artist row really landed in the DB
+        artist = await db.get(Artist, uuid.UUID(body["artist_id"]))
+        assert artist is not None
+        assert artist.name == "Test Artist"
+
+    async def test_returns_409_when_artist_already_exists(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        # ARRANGE
+        db.add(Artist(name="Test Artist", deezer_id="27"))
+        await db.flush()
+        mock = _patch_admin_deezer_client(monkeypatch, artist={"id": 27})
+
+        # ACT
+        response = await client.post(
+            "/api/admin/artists/import-from-deezer",
+            headers=admin_headers,
+            json={"deezer_artist_id": "27"},
+        )
+
+        # ASSERT
+        assert response.status_code == 409
+        # Deezer must NOT have been hit — duplicate check is a pre-flight
+        mock.get_artist.assert_not_awaited()
+
+    async def test_returns_404_when_source_does_not_know_artist(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        # ARRANGE
+        _patch_admin_deezer_client(monkeypatch, artist=None)
+
+        # ACT
+        response = await client.post(
+            "/api/admin/artists/import-from-deezer",
+            headers=admin_headers,
+            json={"deezer_artist_id": "does-not-exist"},
+        )
+
+        # ASSERT
+        assert response.status_code == 404
+
+    async def test_missing_request_body_returns_422(
+        self, client: httpx.AsyncClient, admin_headers: dict[str, str],
+    ):
+        # ACT
+        response = await client.post(
+            "/api/admin/artists/import-from-deezer", headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 422

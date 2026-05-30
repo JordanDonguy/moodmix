@@ -12,7 +12,8 @@ from typing import Any
 
 from app.models.artist import Artist
 from app.models.track import Track
-from app.services.track_import import TrackImportService
+from app.services.clients.deezer.models import DeezerTrack
+from app.services.imports.track_import_service import TrackImportService
 
 # Imported only for AsyncSession type-hint on fixtures.
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: TC002
@@ -25,8 +26,13 @@ async def _make_artist(db: AsyncSession) -> Artist:
     return artist
 
 
-def _payload(**overrides: Any) -> dict[str, Any]:
-    """Build a Deezer-shaped payload with sensible defaults; override per test."""
+def _payload(**overrides: Any) -> DeezerTrack:
+    """Build a parsed Deezer payload with sensible defaults; override per test.
+
+    Tests pass through the real :class:`DeezerTrack` validators so quirky
+    inputs (``"0000-00-00"`` dates, blank ISRCs, string-typed gains)
+    exercise both the parse layer and the service together.
+    """
     base: dict[str, Any] = {
         "id": 123,
         "title": "Test Song",
@@ -36,7 +42,7 @@ def _payload(**overrides: Any) -> dict[str, Any]:
         "gain": -8.4,
     }
     base.update(overrides)
-    return base
+    return DeezerTrack.model_validate(base)
 
 
 class TestImportFromDeezer:
@@ -66,7 +72,9 @@ class TestImportFromDeezer:
         # we shouldn't try to write them when the keys aren't there.
         artist = await _make_artist(db)
         service = TrackImportService(db)
-        payload: dict[str, Any] = {"id": 1, "title": "Test Song", "duration": 200}
+        payload = DeezerTrack.model_validate(
+            {"id": 1, "title": "Test Song", "duration": 200},
+        )
 
         # ACT
         track = await service.import_from_deezer(artist.id, payload)
@@ -203,7 +211,9 @@ class TestUpdateFromDeezer:
         service = TrackImportService(db)
 
         # ACT
-        payload: dict[str, Any] = {"id": 123, "title": "Test Song", "duration": 240}
+        payload = DeezerTrack.model_validate(
+            {"id": 123, "title": "Test Song", "duration": 240},
+        )
         await service.update_from_deezer(track, payload)
         await db.flush()
 

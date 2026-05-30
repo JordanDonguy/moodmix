@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     import httpx
 
     from app.models.track import Track
-    from app.services.clients.deezer_client import DeezerClient
+    from app.services.clients.deezer.client import DeezerClient
 
 
 class PreviewSource(Protocol):
