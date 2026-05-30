@@ -30,8 +30,8 @@ from app.schemas.admin import (
     TrackItem,
 )
 from app.services.admin_service import AdminService
-from app.services.clients.deezer_client import DeezerClient
-from app.services.clients.deezer_models import DeezerArtist, DeezerTrack
+from app.services.clients.deezer.client import DeezerClient
+from app.services.clients.deezer.models import DeezerArtist, DeezerTrack
 from app.services.crawler_service import CrawlerService
 from app.services.imports.artist_import_service import ArtistImportService
 

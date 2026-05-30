@@ -2,8 +2,7 @@
 
 ``DeezerClient`` returns raw ``dict[str, Any]`` because the public-API
 endpoint surface is large and we only need a slice of it. These models
-let callers parse that slice into typed attributes at the boundary
-instead of threading dicts and ``.get()`` chains through the codebase.
+let callers parse that slice into typed attributes at the boundary.
 
 Every model sets ``extra="ignore"`` so Deezer adding or renaming fields
 we don't reference never breaks parsing — we'd only notice if a field

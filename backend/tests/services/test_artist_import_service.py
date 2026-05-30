@@ -18,7 +18,7 @@ from app.exceptions import (
 )
 from app.models.artist import Artist
 from app.models.track import Track
-from app.services.clients.deezer_models import DeezerArtist, DeezerTrack
+from app.services.clients.deezer.models import DeezerArtist, DeezerTrack
 from app.services.imports.artist_import_service import (
     ArtistImportService,
     MusicCatalogSource,

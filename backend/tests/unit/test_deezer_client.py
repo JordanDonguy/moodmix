@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from app.services.clients.deezer_client import DeezerClient
+from app.services.clients.deezer.client import DeezerClient
 
 DeezerHandler = Callable[[httpx.Request], httpx.Response]
 

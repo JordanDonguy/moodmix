@@ -35,8 +35,8 @@ from sqlalchemy import select
 from app.database import async_session
 from app.models.artist import Artist
 from app.models.track import Track
-from app.services.clients.deezer_client import DeezerClient
-from app.services.clients.deezer_models import DeezerTrack
+from app.services.clients.deezer.client import DeezerClient
+from app.services.clients.deezer.models import DeezerTrack
 from app.services.imports.track_import_service import TrackImportService
 from scripts._track_title import normalize_track_title
 

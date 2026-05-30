@@ -30,7 +30,7 @@ from sqlalchemy import select
 from app.database import async_session
 from app.models.artist import Artist
 from app.models.track import Track
-from app.services.clients.deezer_client import DeezerClient
+from app.services.clients.deezer.client import DeezerClient
 from scripts.resolve_deezer_artists_and_tracks import _ingest_tracks_for_artist
 
 TOP_TRACKS_LIMIT = 50

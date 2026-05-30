@@ -12,7 +12,7 @@ from typing import Any
 
 from app.models.artist import Artist
 from app.models.track import Track
-from app.services.clients.deezer_models import DeezerTrack
+from app.services.clients.deezer.models import DeezerTrack
 from app.services.imports.track_import_service import TrackImportService
 
 # Imported only for AsyncSession type-hint on fixtures.

@@ -40,7 +40,7 @@ from app.exceptions import (
 )
 from app.models.artist import Artist
 from app.models.track import Track
-from app.services.clients.deezer_models import DeezerArtist, DeezerTrack
+from app.services.clients.deezer.models import DeezerArtist, DeezerTrack
 from app.services.imports.track_import_service import TrackImportService
 
 if TYPE_CHECKING:

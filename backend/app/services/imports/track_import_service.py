@@ -24,7 +24,7 @@ from app.models.track import Track
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.services.clients.deezer_models import DeezerTrack
+    from app.services.clients.deezer.models import DeezerTrack
 
 log = logging.getLogger(__name__)
 
