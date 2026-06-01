@@ -5,7 +5,12 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import ChannelAlreadyExistsException
+from datetime import UTC, datetime
+
+from app.exceptions import (
+    ArtistNotFoundException,
+    ChannelAlreadyExistsException,
+)
 from app.models.artist import Artist
 from app.models.pipeline_run import PipelineRun
 from app.models.seed_channel import SeedChannel
@@ -271,3 +276,104 @@ class TestGetPipelineStatus:
         assert total == 2
         assert runs[0].pipeline_type == "classification"
         assert runs[1].pipeline_type == "channel_crawl"
+
+
+class TestMarkArtistForReclassification:
+    async def test_clears_classified_at_on_classified_tracks(
+        self, db: AsyncSession,
+    ):
+        # ARRANGE
+        # Two classified tracks + one already-unclassified track for the
+        # same artist. Only the classified ones should be touched.
+        artist = Artist(name="Test Artist", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        classified_at = datetime.now(UTC)
+        classified_tracks = [
+            Track(
+                artist_id=artist.id, title="Song A", deezer_id="1",
+                classified_at=classified_at,
+                classifier_version="v1",
+            ),
+            Track(
+                artist_id=artist.id, title="Song B", deezer_id="2",
+                classified_at=classified_at,
+                classifier_version="v1",
+            ),
+        ]
+        unclassified = Track(
+            artist_id=artist.id, title="Song C", deezer_id="3",
+        )
+        db.add_all([*classified_tracks, unclassified])
+        await db.flush()
+        service = AdminService(db)
+
+        # ACT
+        count = await service.mark_artist_for_reclassification(artist.id)
+
+        # ASSERT
+        assert count == 2
+        for t in classified_tracks:
+            await db.refresh(t)
+            assert t.classified_at is None
+            # classifier_version is intentionally NOT cleared — the next
+            # classify pass overwrites it
+            assert t.classifier_version == "v1"
+        await db.refresh(unclassified)
+        assert unclassified.classified_at is None  # was already null
+
+    async def test_returns_zero_when_no_tracks_classified(
+        self, db: AsyncSession,
+    ):
+        # ARRANGE
+        artist = Artist(name="Test Artist", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        db.add(Track(artist_id=artist.id, title="Song A", deezer_id="1"))
+        await db.flush()
+        service = AdminService(db)
+
+        # ACT
+        count = await service.mark_artist_for_reclassification(artist.id)
+
+        # ASSERT
+        assert count == 0
+
+    async def test_does_not_touch_other_artists_tracks(
+        self, db: AsyncSession,
+    ):
+        # ARRANGE
+        artist_a = Artist(name="Artist A", resolution_tier="confirmed")
+        artist_b = Artist(name="Artist B", resolution_tier="confirmed")
+        db.add_all([artist_a, artist_b])
+        await db.flush()
+        classified_at = datetime.now(UTC)
+        track_a = Track(
+            artist_id=artist_a.id, title="Song A", deezer_id="1",
+            classified_at=classified_at,
+        )
+        track_b = Track(
+            artist_id=artist_b.id, title="Song B", deezer_id="2",
+            classified_at=classified_at,
+        )
+        db.add_all([track_a, track_b])
+        await db.flush()
+        service = AdminService(db)
+
+        # ACT
+        count = await service.mark_artist_for_reclassification(artist_a.id)
+
+        # ASSERT
+        assert count == 1
+        await db.refresh(track_a)
+        await db.refresh(track_b)
+        assert track_a.classified_at is None
+        assert track_b.classified_at is not None  # Artist B untouched
+
+    async def test_raises_when_artist_not_found(self, db: AsyncSession):
+        # ARRANGE
+        service = AdminService(db)
+
+        # ACT / ASSERT
+        with pytest.raises(ArtistNotFoundException):
+            await service.mark_artist_for_reclassification(uuid.uuid4())

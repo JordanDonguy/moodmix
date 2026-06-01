@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import ChannelAlreadyExistsException
+from app.exceptions import ArtistNotFoundException, ChannelAlreadyExistsException
 from app.models.artist import Artist
 from app.models.pipeline_run import PipelineRun
 from app.models.seed_channel import SeedChannel
@@ -101,6 +101,40 @@ class AdminService:
             .order_by(Track.title)
         )
         return artist, list(tracks_result.scalars().all())
+
+    async def mark_artist_for_reclassification(
+        self, artist_id: uuid.UUID,
+    ) -> int:
+        """Clear ``classified_at`` on every classified track of the artist.
+
+        The local Essentia script picks tracks up via ``classified_at IS NULL``,
+        so clearing the timestamp re-enqueues them for the next local run.
+        Already-unclassified tracks are left alone (they're in the queue
+        already).
+
+        Returns the count of tracks marked. Raises
+        :class:`ArtistNotFoundException` when no artist has this ID.
+        """
+        artist_exists = await self._db.execute(
+            select(Artist.id).where(Artist.id == artist_id)
+        )
+        if artist_exists.scalar_one_or_none() is None:
+            raise ArtistNotFoundException(str(artist_id))
+
+        result = await self._db.execute(
+            update(Track)
+            .where(Track.artist_id == artist_id)
+            .where(Track.classified_at.is_not(None))
+            .values(classified_at=None)
+            .returning(Track.id)
+        )
+        affected_ids = list(result.scalars().all())
+        await self._db.commit()
+        logger.info(
+            "marked %d tracks of artist %s for reclassification",
+            len(affected_ids), artist_id,
+        )
+        return len(affected_ids)
 
     async def get_pipeline_status(self, limit: int = 20) -> tuple[list[PipelineRun], int]:
         count_result = await self._db.execute(
