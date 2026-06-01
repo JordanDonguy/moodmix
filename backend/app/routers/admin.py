@@ -9,8 +9,10 @@ from app.database import get_db
 from app.exceptions import (
     AppException,
     ArtistNotFoundException,
+    RateLimitExceededException,
 )
 from app.middleware.auth import require_admin_key
+from app.models.artist import Artist
 from app.models.track import Track
 from app.schemas.admin import (
     AddChannelRequest,
@@ -31,6 +33,7 @@ from app.schemas.admin import (
     MarkForReclassificationResponse,
     PipelineRunResponse,
     PipelineStatusResponse,
+    ResolveStreamingResponse,
     TrackItem,
 )
 from app.services.admin_service import AdminService
@@ -38,6 +41,10 @@ from app.services.clients.deezer.client import DeezerClient
 from app.services.clients.deezer.models import DeezerArtist, DeezerTrack
 from app.services.crawler_service import CrawlerService
 from app.services.imports.artist_import_service import ArtistImportService
+from app.services.streaming.link_finder import LinkFinder, RateLimitedError
+from app.services.streaming.streaming_resolution_service import (
+    StreamingResolutionService,
+)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
@@ -71,6 +78,14 @@ async def get_artist_import_service(
         yield ArtistImportService(db, deezer)
     finally:
         await deezer.close()
+
+
+def get_streaming_resolution_service(
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResolutionService:
+    """Factory for StreamingResolutionService. The LinkFinder it owns is
+    stateless (no httpx session) so no teardown is needed."""
+    return StreamingResolutionService(db, LinkFinder())
 
 
 def _candidate_response(parsed: DeezerArtist) -> DeezerArtistCandidate:
@@ -320,6 +335,36 @@ async def import_artist_from_deezer(
         deezer_id=artist.deezer_id or request.deezer_artist_id,
         tracks_inserted=inserted,
         tracks_skipped=skipped,
+    )
+
+
+@router.post(
+    "/artists/{artist_id}/resolve-streaming",
+    response_model=ResolveStreamingResponse,
+)
+async def resolve_streaming_for_artist(
+    artist_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    service: StreamingResolutionService = Depends(get_streaming_resolution_service),
+) -> ResolveStreamingResponse:
+    """Resolve YouTube + SoundCloud links for every unresolved track of an artist.
+
+    Runs synchronously — expect 1-3s per track via yt-dlp. Raises 404 if
+    the artist doesn't exist, 429 if Deezer/SoundCloud rate-limit
+    persists through the run.
+    """
+    if await db.get(Artist, artist_id) is None:
+        raise ArtistNotFoundException(str(artist_id))
+
+    try:
+        newly_resolved, attempted = await service.resolve_artist(artist_id)
+    except RateLimitedError as e:
+        raise RateLimitExceededException() from e
+
+    return ResolveStreamingResponse(
+        artist_id=artist_id,
+        newly_resolved=newly_resolved,
+        attempted=attempted,
     )
 
 

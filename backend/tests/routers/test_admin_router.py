@@ -707,6 +707,92 @@ class TestImportArtistFromDeezer:
         assert response.status_code == 422
 
 
+class TestResolveStreamingForArtist:
+    """Override the StreamingResolutionService factory so we never hit yt-dlp."""
+
+    @staticmethod
+    def _override_service(mock: AsyncMock) -> None:
+        from app.main import app
+        from app.routers.admin import get_streaming_resolution_service
+        app.dependency_overrides[get_streaming_resolution_service] = lambda: mock
+
+    async def test_returns_counts_from_service(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+    ):
+        # ARRANGE
+        artist = Artist(name="Test Artist", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        mock = AsyncMock()
+        mock.resolve_artist = AsyncMock(return_value=(3, 5))
+        self._override_service(mock)
+
+        # ACT
+        response = await client.post(
+            f"/api/admin/artists/{artist.id}/resolve-streaming",
+            headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        body = response.json()
+        assert body == {
+            "artist_id": str(artist.id),
+            "newly_resolved": 3,
+            "attempted": 5,
+        }
+        mock.resolve_artist.assert_awaited_once_with(artist.id)
+
+    async def test_returns_404_when_artist_not_found(
+        self, client: httpx.AsyncClient, admin_headers: dict[str, str],
+    ):
+        # ARRANGE
+        mock = AsyncMock()
+        self._override_service(mock)
+
+        # ACT
+        response = await client.post(
+            f"/api/admin/artists/{uuid.uuid4()}/resolve-streaming",
+            headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 404
+        # Service must NOT have been hit — existence check is a pre-flight
+        mock.resolve_artist.assert_not_awaited()
+
+    async def test_returns_429_when_rate_limit_persists(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+    ):
+        # ARRANGE
+        # Import locally to avoid touching yt_dlp at module-import time
+        from app.services.streaming.link_finder import RateLimitedError
+
+        artist = Artist(name="Test Artist", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        mock = AsyncMock()
+        mock.resolve_artist = AsyncMock(
+            side_effect=RateLimitedError("ytsearch1: HTTP Error 429"),
+        )
+        self._override_service(mock)
+
+        # ACT
+        response = await client.post(
+            f"/api/admin/artists/{artist.id}/resolve-streaming",
+            headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 429
+
+
 class TestMarkArtistForClassification:
     async def test_clears_classified_at_on_artists_tracks(
         self,

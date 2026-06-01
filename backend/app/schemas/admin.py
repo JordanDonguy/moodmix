@@ -139,6 +139,13 @@ class ImportArtistResponse(BaseModel):
     tracks_skipped: int
 
 
+class ResolveStreamingResponse(BaseModel):
+    """Result of resolving streaming URLs for every unresolved track of an artist."""
+    artist_id: uuid.UUID
+    newly_resolved: int
+    attempted: int
+
+
 class MarkForReclassificationResponse(BaseModel):
     """Result of clearing ``classified_at`` for an artist's tracks."""
     artist_id: uuid.UUID
