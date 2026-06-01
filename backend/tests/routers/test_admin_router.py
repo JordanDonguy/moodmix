@@ -705,3 +705,51 @@ class TestImportArtistFromDeezer:
 
         # ASSERT
         assert response.status_code == 422
+
+
+class TestMarkArtistForClassification:
+    async def test_clears_classified_at_on_artists_tracks(
+        self,
+        client: httpx.AsyncClient,
+        admin_headers: dict[str, str],
+        db: AsyncSession,
+    ):
+        # ARRANGE
+        from datetime import UTC, datetime
+        artist = Artist(name="Test Artist", resolution_tier="confirmed")
+        db.add(artist)
+        await db.flush()
+        classified_at = datetime.now(UTC)
+        track = Track(
+            artist_id=artist.id, title="Song A", deezer_id="1",
+            classified_at=classified_at,
+        )
+        db.add(track)
+        await db.flush()
+
+        # ACT
+        response = await client.post(
+            f"/api/admin/artists/{artist.id}/mark-for-classification",
+            headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        assert response.json() == {
+            "artist_id": str(artist.id),
+            "tracks_marked": 1,
+        }
+        await db.refresh(track)
+        assert track.classified_at is None
+
+    async def test_returns_404_when_artist_not_found(
+        self, client: httpx.AsyncClient, admin_headers: dict[str, str],
+    ):
+        # ACT
+        response = await client.post(
+            f"/api/admin/artists/{uuid.uuid4()}/mark-for-classification",
+            headers=admin_headers,
+        )
+
+        # ASSERT
+        assert response.status_code == 404

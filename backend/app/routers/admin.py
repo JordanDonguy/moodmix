@@ -6,7 +6,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.exceptions import AppException
+from app.exceptions import (
+    AppException,
+    ArtistNotFoundException,
+)
 from app.middleware.auth import require_admin_key
 from app.models.track import Track
 from app.schemas.admin import (
@@ -25,6 +28,7 @@ from app.schemas.admin import (
     FreshPreviewResponse,
     ImportArtistRequest,
     ImportArtistResponse,
+    MarkForReclassificationResponse,
     PipelineRunResponse,
     PipelineStatusResponse,
     TrackItem,
@@ -34,7 +38,6 @@ from app.services.clients.deezer.client import DeezerClient
 from app.services.clients.deezer.models import DeezerArtist, DeezerTrack
 from app.services.crawler_service import CrawlerService
 from app.services.imports.artist_import_service import ArtistImportService
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
@@ -317,4 +320,25 @@ async def import_artist_from_deezer(
         deezer_id=artist.deezer_id or request.deezer_artist_id,
         tracks_inserted=inserted,
         tracks_skipped=skipped,
+    )
+
+
+@router.post(
+    "/artists/{artist_id}/mark-for-classification",
+    response_model=MarkForReclassificationResponse,
+)
+async def mark_artist_for_classification(
+    artist_id: uuid.UUID,
+    service: AdminService = Depends(get_admin_service),
+) -> MarkForReclassificationResponse:
+    """Re-enqueue an artist's tracks for the next local Essentia pass.
+
+    Clears ``classified_at`` on every already-classified track of the
+    artist; the local classify script picks them back up via its
+    ``IS NULL`` filter. No-op for tracks that are already unclassified.
+    Raises 404 if the artist doesn't exist.
+    """
+    tracks_marked = await service.mark_artist_for_reclassification(artist_id)
+    return MarkForReclassificationResponse(
+        artist_id=artist_id, tracks_marked=tracks_marked,
     )

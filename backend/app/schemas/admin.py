@@ -137,3 +137,9 @@ class ImportArtistResponse(BaseModel):
     deezer_id: str
     tracks_inserted: int
     tracks_skipped: int
+
+
+class MarkForReclassificationResponse(BaseModel):
+    """Result of clearing ``classified_at`` for an artist's tracks."""
+    artist_id: uuid.UUID
+    tracks_marked: int
